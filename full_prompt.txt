@@ -1,0 +1,1529 @@
+======================
+======================
+行业prompt
+======================
+======================
+
+你是一名资深 AI 系统架构师和 Python 工程师。
+
+我正在构建一个 A 股投研助手 agent，目前已经有一个“个股调研模块”，它能够输出：
+- 结构化公司分析
+- 带观点的结论
+- 偏投资决策辅助的判断
+
+我现在要新增一个“行业 Thesis 模块”。
+
+你的任务不是做完整产品，而是为这个行业模块设计并生成一个：
+- 结构清晰
+- 易扩展
+- 方便后续接入个股模块/组合模块
+- 偏工程化
+- 适合 v1 的最小实现骨架
+
+请注意：我的使用场景以 A 股为主，研究材料、报告、新闻理论上也以中文为主。
+
+======================
+一、模块目标
+======================
+
+这个模块的目标不是一次性生成行业报告，而是把“行业 thesis”做成一个可持续更新的、有状态的对象。
+
+要求：
+- 行业 thesis 有当前版本
+- 行业 thesis 有历史版本
+- 新分析应优先关注“变化（delta）”，而不是每次从头分析
+- 支持主动调用时更新
+- 支持每周定期更新
+- 供其他模块复用（尤其是个股调研模块）
+
+个股模块与行业模块的关系应当是：
+
+行业 thesis
+-> 提供行业上下文和情景判断
+-> 个股模块读取最新行业 thesis
+-> 个股模块判断某公司是否符合行业 thesis、受益于哪些驱动、暴露于哪些风险
+
+======================
+二、行业粒度与标签
+======================
+
+行业 thesis 的主对象必须基于申万行业分类体系。
+
+请支持：
+- 申万一级
+- 申万二级
+- 申万三级
+
+要求：
+- 主 thesis 对象始终挂在标准化的申万行业 ID 上
+- 报告中可以抽取“概念标签”
+- 但 concept tags 只是辅助标签，不是主对象
+- concept tags 只用于：
+  - 检索增强
+  - 报告联动
+  - 跨行业/事件关联
+
+请在架构设计里明确：
+- 申万行业是主对象
+- concept tags 是辅助标签，不单独维护完整 thesis
+
+======================
+三、Industry Thesis Card 结构
+======================
+
+请定义一个结构化的 Industry Thesis Card，至少包括：
+
+- industry_id
+- industry_name
+- sw_level
+- as_of_date
+- version
+
+- last_news_update_at
+- last_market_data_update_at
+- last_full_refresh_at
+
+- definition
+- value_chain
+- core_drivers[]
+- core_conflicts[]
+
+- bull_case
+- base_case
+- bear_case
+
+- current_bias
+- bias_reason
+- bias_shift_risk
+
+- key_metrics_to_watch[]
+- companies_to_watch[]
+- latest_changes[]
+
+- confidence
+- source_refs[]
+- concept_tags[]
+
+请使用强类型 schema（如 Pydantic）定义。
+
+======================
+四、多情景与当前 bias
+======================
+
+每个行业 thesis 必须显式维护：
+
+- bull_case
+- base_case
+- bear_case
+- current_bias
+- bias_reason
+- bias_shift_risk
+
+其中：
+- current_bias 表示当前主判断
+- bias_shift_risk 表示什么事件会让当前 bias 切换到其他情景
+
+不要把行业结论简化成单一观点。
+
+======================
+五、存储设计
+======================
+
+请把存储分成两层：
+
+1）结构化主存储（source of truth）
+用于保存：
+- 最新 thesis card
+- 历史 thesis 版本
+- 更新元数据
+
+建议：
+- SQLite 或 PostgreSQL
+
+2）语义检索存储（辅助）
+用于保存：
+- 历史报告
+- 新闻摘要
+- 长文本 reasoning
+- 给 update agent 提供上下文
+
+建议：
+- vector DB
+
+重要要求：
+- 不要把 vector DB 作为 thesis 状态的主存储
+- 结构化 DB 才是 source of truth
+
+======================
+六、更新策略
+======================
+
+请支持三类更新：
+
+1）Light Update
+触发条件：
+- 距离上次新闻更新超过 24 小时
+
+更新范围：
+- latest_changes
+- confidence
+- 必要时小幅调整 bias
+
+2）Market Update
+触发条件：
+- 自上次 market data update 以来出现新的交易日
+
+更新范围：
+- key metrics
+- 市场敏感判断
+- 必要时调整 scenario bias
+
+3）Weekly Full Refresh
+触发条件：
+- 每周定时任务
+
+更新范围：
+- 所有字段都可重新审视
+- drivers / conflicts / scenarios 可整体更新
+
+======================
+七、触发逻辑
+======================
+
+请支持两类触发：
+
+A. On-request refresh
+当其他模块请求行业 thesis 时：
+- 检查是否需要新闻更新
+- 检查是否需要市场数据更新
+- 如有必要，先做增量更新，再返回 thesis
+
+B. 定期刷新
+每周定期刷新，但不是全市场全覆盖。
+
+要求：
+- 每周只刷新约 5–8 个行业
+- 由一个独立的 prioritizer 子模块动态选出名单
+
+======================
+八、Industry Prioritizer
+======================
+
+请单独设计一个 Industry Prioritizer 子模块。
+
+它的职责是：
+- 每周动态选出 5–8 个行业做 full refresh
+
+候选排序可考虑：
+- 行业轮动强度
+- 新闻热度
+- 与当前持仓/观察池的相关性
+- thesis 变化频率
+- 距离上次 full refresh 的时间
+
+请把 prioritizer 作为独立重要子模块，而不是写死规则。
+
+======================
+九、Update Agent
+======================
+
+请设计一个 Industry Update Agent。
+
+它的职责应当非常收敛，只做：
+
+- 读取旧 thesis
+- 拉取新增信息
+- 判断哪些字段受影响
+- 输出结构化 delta
+- 生成新版本 thesis
+
+重要要求：
+- 不要把它做成自由发挥的行业报告生成器
+- 它应该是“状态化 thesis 的受控更新器”
+
+======================
+十、与其他模块的集成
+======================
+
+请将行业模块设计成一个可被其他模块调用的 service。
+
+至少支持类似接口：
+
+- get_industry_thesis(industry_id)
+- refresh_industry_thesis(industry_id, mode=light|market|full)
+- get_industry_delta(industry_id, since_version)
+- get_weekly_refresh_candidates()
+
+个股模块未来需要能够：
+- 将股票映射到申万行业
+- 获取最新行业 thesis
+- 用 thesis 作为个股判断上下文
+
+======================
+十一、concept tags 要求
+======================
+
+请支持从中文报告/文本中抽取 concept tags，但要求：
+
+- concept tags 只是辅助标签
+- 需要归一化
+- 数量需要受限
+- v1 不要把 concept tags 做成主分析对象
+- 避免 taxonomy 无限制膨胀
+
+======================
+十二、v1 明确不做
+======================
+
+v1 不要实现：
+
+- 完整行业知识图谱
+- 多 agent 协作
+- 全市场自动覆盖
+- 复杂事件驱动系统
+- 复杂概率引擎
+- 自由扩张的概念本体系统
+
+请保持：
+- 结构清晰
+- 可扩展
+- 但不过度设计
+
+======================
+十三、技术与实现要求
+======================
+
+请优先使用：
+- Python 3.11+
+- Pydantic
+- 清晰模块化设计
+- 强类型
+- 简洁但可扩展的接口
+
+建议模块结构可参考：
+
+industry/
+  schemas.py
+  models.py
+  repository.py
+  service.py
+  updater.py
+  triggers.py
+  prioritizer.py
+  scheduler.py
+  retriever.py
+  prompts.py
+  tests/
+
+你也可以调整，但要说明理由。
+
+======================
+十四、交付要求
+======================
+
+请先输出以下内容，不要直接生成完整代码：
+
+1. 模块整体架构
+2. 数据模型设计
+3. 模块边界划分
+4. 更新流程设计
+5. prioritizer 设计
+6. 关键 trade-offs / 风险点
+7. 推荐实现顺序
+
+在我确认后，再生成代码骨架。
+
+额外要求：
+- 这是一个个人投研系统 v1，不是企业级大平台
+- 请优先考虑：简单、可调试、可维护、可演进
+- 避免巨型文件
+- 避免把 storage / prompt / business logic 混在一起
+- 中文语料和中文报告应作为默认前提
+
+先不要生成代码。
+只输出：
+architecture / data model / module boundaries / update flow / trade-offs
+
+
+
+
+======================
+======================
+宏观prompt
+======================
+======================
+
+你是一名资深 AI 系统架构师和 Python 工程师。
+
+我正在构建一个以 A 股为主的投研助手 agent。当前已经有个股调研模块、正在规划行业模块，现在还需要新增一个“宏观模块”。
+
+你的任务不是做完整产品，而是为这个宏观模块设计一个：
+- 结构清晰
+- 易扩展
+- 可维护
+- 适合 v1 的工程化模块骨架
+
+请注意：
+- 我的研究和报告主要是中文语料
+- 这个宏观模块主要服务于行业模块和组合/配置判断
+- 宏观模块不是独立写宏观长报告，而是维护一个“可持续更新的宏观 thesis 系统”
+
+======================
+一、模块目标
+======================
+
+宏观模块的目标是维护一套面向 A 股的“宏观 thesis 卡片”，并通过每日增量更新，为下游模块提供上层约束。
+
+它主要回答：
+- 当前宏观主线是什么
+- 当前哪些宏观因素在驱动 A 股风格和行业偏好
+- 与上一次相比，哪些判断发生了变化
+- 哪些申万一级行业当前偏利多 / 偏利空 / 中性
+- 是否发生了显著变化（material change），需要联动下游模块
+
+这个模块需要：
+- 保留最新观点
+- 保留历史版本
+- 支持复盘历史判断
+- 支持每日按事件更新
+- 输出风险 / 机会提示
+- 为行业模块提供宏观约束
+
+======================
+二、模块结构
+======================
+
+请将宏观模块设计成两层结构：
+
+1）Macro Master Card（总卡片）
+2）四类统一子卡片
+
+四类子卡片分别是：
+- 国内总量
+- 政策环境
+- 海外映射
+- 市场风格
+
+要求：
+- 总卡片做综合判断
+- 子卡片保留变化来源、判断原因和证据
+- 四类子卡片尽量共用统一 schema
+
+======================
+三、Macro Master Card 要求
+======================
+
+请为总卡片设计结构化 schema，至少包括：
+
+- as_of_date
+- current_macro_bias
+- macro_mainline
+- key_changes[]
+- risk_opportunity_flags[]
+- a_share_style_impact
+- sw_l1_positive[]
+- sw_l1_negative[]
+- sw_l1_neutral[]
+- reasoning
+- source_refs[]
+- confidence
+- material_change
+
+说明：
+- `material_change` 必须强制输出，表示这次更新是否发生了显著变化
+- 总卡片输出风格应为“中等长度”，既有判断，也有原因，不要太长
+
+======================
+四、current_macro_bias 要求
+======================
+
+请显式维护 `current_macro_bias`。
+
+要求：
+- 从固定候选标签集合中选出
+- 不是自由生成
+- 最多 3 个标签
+- 通过排序体现主次，不需要额外显式 primary/secondary 字段
+
+当前候选标签集合可先使用：
+
+- 流动性主导
+- 政策预期主导
+- 基本面验证主导
+- 风险偏好修复
+- 外部扰动主导
+- 防御偏好抬升
+- 顺周期交易升温
+- 主题风险偏好主导
+
+同时需要有简短解释说明为什么当前是这些 bias。
+
+======================
+五、子卡片要求
+======================
+
+四类子卡片尽量使用统一 schema，至少包括：
+
+- theme_type
+- as_of_date
+- current_view
+- latest_changes[]
+- drivers[]
+- risks[]
+- a_share_style_impact
+- sw_l1_positive[]
+- sw_l1_negative[]
+- sw_l1_neutral[]
+- reasoning
+- source_refs[]
+- confidence
+
+theme_type 取值：
+- 国内总量
+- 政策环境
+- 海外映射
+- 市场风格
+
+======================
+六、更新逻辑
+======================
+
+宏观模块采用“每日增量更新”，不是每天重写整张宏观卡片。
+
+每日更新主线固定为：
+
+今日关键事件
+-> 影响哪个子卡片
+-> 是否改变 thesis
+-> 变化原因
+-> 是否联动更新 Master Card
+-> 输出申万一级行业映射
+
+要求：
+- 只更新受影响的子卡片
+- 总卡片只更新变化部分
+- 强制输出是否发生 `material_change`
+
+======================
+七、行业映射要求
+======================
+
+宏观模块需要把判断映射到申万一级行业。
+
+v1 要求：
+- 只做到申万一级行业
+- 映射结果分三档：
+  - 利多
+  - 利空
+  - 中性
+
+实现原则：
+- 以“规则化骨架”为主
+- agent 根据当日事件和 thesis 做修正
+
+也就是说：
+- 不要完全依赖 agent 自由生成行业映射
+- 需要一个可维护的规则层
+
+======================
+八、数据源要求
+======================
+
+当前数据源还没有最终确定，因此实现上请预留接口，不要写死具体供应商。
+
+要求：
+- 使用抽象接口设计 news / policy / macro event / market style signal 的输入源
+- 方便后续替换或扩展数据源
+- 中文新闻和中文报告作为默认语境
+
+v1 倾向于：
+- 只看少数高相关来源
+- 只处理高相关事件类型
+- 不追求全网全量抓取
+
+======================
+九、历史归档与复盘
+======================
+
+请支持历史归档和复盘。
+
+至少保留：
+- 每日 Master Card 快照
+- 每张子卡片历史版本
+- 每次变化 delta
+- 变化原因
+- 当时的申万一级行业映射
+
+这样后续可以复盘：
+- 当时为什么这么判断
+- 后续是否被验证
+- 哪些 bias 经常切换
+
+======================
+十、与其他模块的关系
+======================
+
+宏观模块主要服务于：
+- 行业模块
+- 组合/配置判断模块
+
+建议关系为：
+
+宏观模块
+-> 提供上层环境和行业偏好约束
+-> 行业模块读取宏观 thesis 后再修正行业 thesis
+-> 个股模块不直接大量读取宏观原始事件
+
+请在设计中体现这种上下游关系。
+
+======================
+十一、v1 不做
+======================
+
+v1 不要实现：
+
+- 复杂宏观预测引擎
+- 全量指标自动抓取与建模
+- 申万二级/三级映射
+- 直接仓位建议
+- 全网新闻覆盖
+- 复杂事件驱动系统
+- 多 agent 协作
+
+请保持：
+- 简洁
+- 可调试
+- 可维护
+- 可演进
+- 不过度设计
+
+======================
+十二、技术与实现要求
+======================
+
+请优先使用：
+- Python 3.11+
+- Pydantic
+- 清晰模块化设计
+- 强类型
+- 简洁但可扩展的接口
+
+建议模块结构可参考：
+
+macro/
+  schemas.py
+  models.py
+  repository.py
+  service.py
+  updater.py
+  mapper.py
+  triggers.py
+  retriever.py
+  prompts.py
+  tests/
+
+你也可以调整，但要说明理由。
+
+======================
+十三、交付要求
+======================
+
+请先不要生成完整代码。
+
+请先输出：
+
+1. 模块整体架构
+2. 数据模型设计
+3. 模块边界划分
+4. 每日更新流程
+5. 行业映射层设计（规则骨架 + agent 修正）
+6. 历史归档设计
+7. 关键 trade-offs / 风险点
+8. 推荐实现顺序
+
+额外要求：
+- 这是个人投研系统 v1，不是企业级大平台
+- 请优先考虑简单、可维护、可调试
+- 避免巨型文件
+- 避免把 storage / prompt / business logic 混在一起
+
+
+先不要生成代码。
+只输出：
+architecture / data model / module boundaries / daily update flow / mapping design
+
+
+
+======================
+======================
+接口关系prompt
+======================
+======================
+
+
+你是一名资深 AI 系统架构师和 Python 工程师。
+
+我已经分别设计了两个模块：
+1. 宏观模块（Macro Thesis Module）
+2. 行业模块（Industry Thesis Module）
+
+现在你的任务不是写完整代码，而是设计这两个模块之间的接口关系与集成边界。
+
+目标：
+- 保持模块解耦
+- 明确上下游关系
+- 避免循环依赖
+- 支持未来扩展
+- 方便后续生成代码骨架
+
+======================
+一、模块关系
+======================
+
+模块关系应当是：
+
+宏观模块
+-> 提供上层环境、风格偏好、行业偏好约束
+-> 行业模块读取宏观 thesis
+-> 行业模块在宏观约束下更新或修正自己的行业 thesis
+-> 个股模块再读取行业 thesis
+
+即：
+
+宏观模块 → 行业模块 → 个股模块
+
+请保持这个方向，不要设计成宏观与行业互相强耦合、互相控制。
+
+======================
+二、接口设计目标
+======================
+
+请设计：
+- 宏观模块向行业模块暴露哪些服务接口
+- 行业模块如何读取宏观结论
+- 宏观发生显著变化时，如何影响行业模块
+- 如何避免行业模块直接依赖宏观模块内部实现细节
+- 如何保持两个模块各自独立维护自己的 thesis 状态
+
+======================
+三、宏观模块已知约束
+======================
+
+宏观模块维护：
+- Macro Master Card
+- 4 类子卡片（国内总量 / 政策环境 / 海外映射 / 市场风格）
+
+宏观模块关键输出包括：
+- current_macro_bias（固定候选集合中选，最多 3 个，按排序体现主次）
+- macro_mainline
+- key_changes[]
+- risk_opportunity_flags[]
+- a_share_style_impact
+- sw_l1_positive[]
+- sw_l1_negative[]
+- sw_l1_neutral[]
+- reasoning
+- confidence
+- material_change
+
+宏观模块每日做增量更新，不是每天重写整张卡。
+
+======================
+四、行业模块已知约束
+======================
+
+行业模块维护：
+- 基于申万行业分类的 Industry Thesis Card
+- 支持申万一级/二级/三级
+- 主对象始终挂在标准化申万 industry_id 上
+- concept tags 只是辅助标签，不是主对象
+
+行业模块关键字段包括：
+- definition
+- value_chain
+- core_drivers[]
+- core_conflicts[]
+- bull_case
+- base_case
+- bear_case
+- current_bias
+- bias_reason
+- bias_shift_risk
+- key_metrics_to_watch[]
+- companies_to_watch[]
+- latest_changes[]
+- confidence
+- source_refs[]
+- concept_tags[]
+
+行业模块支持：
+- on-request refresh
+- weekly full refresh
+- incremental update
+
+======================
+五、你需要设计的接口关系
+======================
+
+请设计并说明：
+
+1. 宏观模块对行业模块应暴露哪些接口？
+例如：
+- get_macro_master_card()
+- get_macro_delta(since_version)
+- should_industry_recheck(industry_id)
+- get_macro_constraints_for_industry(industry_id)
+
+2. 行业模块如何消费宏观输出？
+例如：
+- 读取哪些字段作为行业 thesis 的上层约束
+- 如何把宏观的 sw_l1 positive/negative 映射到行业 thesis 更新逻辑
+
+3. 宏观 material_change 如何联动行业模块？
+例如：
+- 哪些类型的 material_change 会触发行业重检
+- 是触发 full refresh、partial refresh，还是只打标记等待下次请求时刷新
+
+4. 如何避免循环依赖？
+例如：
+- 行业模块不能反向修改宏观模块
+- 行业模块只能消费宏观模块公开 service / DTO
+- 共享字段通过契约对象传递，而不是直接共享内部模型
+
+5. 如何设计 integration layer？
+是否需要单独一层：
+- context bridge
+- orchestration service
+- contract DTO layer
+
+======================
+六、推荐的工程原则
+======================
+
+请遵循以下原则：
+- 宏观模块是上层约束，不是行业模块的内部子组件
+- 行业模块读取宏观结论，但保留独立判断
+- 两个模块各自维护自己的状态和版本历史
+- 不要把两个模块的 repository / prompt / updater 混在一起
+- 接口应尽量稳定、清晰、强类型
+- 优先面向 v1 的简单集成，不要过度设计
+
+======================
+七、交付要求
+======================
+
+请先输出：
+1. 两个模块之间的关系图（文字描述即可）
+2. 推荐接口列表
+3. 推荐共享 DTO / contract 设计
+4. 推荐联动规则
+5. 推荐 integration layer 结构
+6. 潜在耦合风险与规避方式
+7. 推荐实现顺序
+
+先不要生成代码。
+先输出：
+interfaces / shared DTO / linkage rules / coupling risks
+
+
+
+======================
+======================
+企业层重构 + company_context Prompt
+======================
+======================
+
+你是一名资深 AI 系统架构师和 Python 工程师。
+
+我正在把一个原本用 n8n 实现的企业层分析 workflow，迁移到本地，用 Python + LangGraph 重构。
+
+这个系统是一个以 A 股为主的投研助手。当前已经在规划：
+- 宏观模块（Macro Thesis Module）
+- 行业模块（Industry Thesis Module）
+
+现在我希望你帮助我设计“企业层分析模块”的本地重构方案，并明确它如何与宏观模块、行业模块耦合。
+
+请注意：
+- 不需要考虑继续依赖 n8n
+- 目标是本地 LangGraph 架构
+- 重点是工程结构、模块边界、数据契约
+- 不要一开始就生成完整代码
+
+======================
+一、背景与目标
+======================
+
+当前企业层 workflow 已经具备以下能力雏形：
+- 数据更新 / query 流程
+- 计算指标
+- 多 agent 讨论 / 辩论
+- 企业分析主流程
+
+但目前存在的问题：
+- 原始 workflow 中，很多取数、计算、解释混在一起
+- analyst 直接消费杂糅的数据结果
+- 还没有和宏观/行业模块形成清晰耦合
+- 某些 analyst（如 news analyst / sentiment analyst）尚未完成
+- 当前主要是 basic llm chain，而不是更可控的本地架构
+
+目标是：
+- 把企业层 workflow 重构为本地 LangGraph 系统
+- 把确定性取数/计算尽量前置
+- 通过标准化的 `company_context` 把企业层和宏观/行业模块连接起来
+- 保留 agent 后续按需调用工具的能力
+
+======================
+二、核心设计原则
+======================
+
+请遵循以下原则：
+
+1. 高确定性、可复用的信息准备工作应当尽量前置
+2. agent 不需要对所有事情都自由决定是否查数
+3. 但 agent 仍然保留在必要时继续调用工具的能力
+4. tool / service / graph node 应职责清晰
+5. 宏观模块和行业模块不应直接耦合到所有 analyst prompt 中
+6. 应通过一个标准化 `company_context` 作为企业层的统一上下文输入
+
+======================
+三、目标主链
+======================
+
+请以如下重构主链为核心进行设计：
+
+ticker
+-> company_data_service
+-> metrics_tools
+-> concept_tag_extractor
+-> company_context_assembler
+-> market_analyst / fundamental_analyst
+-> debate
+
+说明：
+- `company_data_service`：取公司基础数据、行情、财务、申万行业标签等
+- `metrics_tools`：做各类确定性计算
+- `concept_tag_extractor`：从公司/行业相关文本中提取 concept tags
+- `company_context_assembler`：拼装标准化 `company_context`
+- `market_analyst / fundamental_analyst`：先消费 `company_context`
+- `debate`：后续消费 analyst 输出
+
+请不要把自然语言分析逻辑重新塞回取数和计算层。
+
+======================
+四、tool / service / node 的职责
+======================
+
+请明确区分：
+
+1）service
+普通 Python 业务逻辑，不依赖 LangGraph，可单测、可复用
+
+2）tool
+适合 agent 或 service 调用的确定性能力，例如：
+- 指标计算
+- 行业映射
+- 读取宏观摘要
+- 读取行业 thesis 摘要
+
+3）LangGraph node
+图中的节点函数，负责：
+- 从 graph state 取输入
+- 调用 service / tool
+- 写回 state
+
+请优先采用：
+- 核心逻辑写成 service / tool
+- 再通过很薄的 node wrapper 挂接到 LangGraph
+
+======================
+五、company_context 的定位
+======================
+
+`company_context` 不是 tool，不是 prompt，而是：
+
+- 上游各类 service / tool 的结构化汇总结果
+- 下游 analyst / debate 的统一输入对象
+
+它的目标是：
+- 作为企业层的标准化工作底稿
+- 承接公司自身数据 + 宏观约束 + 行业约束
+- 减少 analyst 重复取数和重复理解上下文
+- 保持 contract 稳定、偏薄、可维护
+
+======================
+六、company_context 要求
+======================
+
+请围绕以下 contract 设计：
+
+company_context:
+  ts_code
+  company_name
+  trade_date
+
+  sw_l1_name
+  sw_l2_name
+  sw_l3_name
+  sw_l1_id
+  sw_l2_id
+  sw_l3_id
+  primary_industry_level
+  concept_tags[]
+
+  as_of_date
+  market_data_ref
+  financial_data_ref
+  news_data_ref
+
+  computed_metrics:
+    technical_metrics
+    valuation_metrics
+    financial_quality_metrics
+    risk_metrics
+    highlight_flags[]   # 数量控制在 5 个以下
+
+  macro_constraints_summary:
+    macro_biases[]      # 最多 3 个，按排序体现主次
+    macro_mainline
+    style_impact
+    industry_mapping_signal_for_company
+    material_change
+    reasoning_summary
+
+  industry_thesis_summary:
+    industry_level_used
+    current_bias
+    bull_base_bear_summary
+    key_drivers[]
+    key_risks[]
+    company_fit_questions[]
+
+  macro_context_ref
+  industry_thesis_ref
+  context_version
+  context_as_of_date
+
+要求：
+- `company_context` 尽量偏薄
+- 不要把整张宏观卡片或整张行业卡片原样塞进去
+- 只放 analyst 最常用的压缩摘要
+- 保留 ref 字段供未来追踪
+
+======================
+七、computed_metrics 要求
+======================
+
+请把确定性计算尽量做成 tool / service，而不是放到 prompt 里临时计算。
+
+至少考虑拆出：
+
+- technical metrics
+- valuation metrics
+- financial quality metrics
+- risk metrics
+- highlight flag generation
+
+要求：
+- 指标结果应结构化
+- 每类结果可包含数值 + 简短解释
+- 不要过多自然语言包装
+- 适合后续复用与单元测试
+
+======================
+八、concept_tag_extractor 要求
+======================
+
+请将 `concept_tag_extractor` 设计为单独 service，而不是塞进 assembler 内部。
+
+v1 要求：
+- 先由 LLM 从公司/行业相关文本中抽取 concept tags
+- 后续再考虑归一化
+- concept tags 先作为辅助标签使用
+- 不要在 v1 中把 concept tags 做成复杂知识体系
+
+======================
+九、宏观与行业模块的耦合方式
+======================
+
+企业层不应直接读取宏观/行业模块的完整内部状态，而应通过压缩摘要接入。
+
+请采用以下原则：
+
+1. 宏观模块提供压缩后的 `macro_constraints_summary`
+2. 行业模块提供压缩后的 `industry_thesis_summary`
+3. 企业层通过 `company_context_assembler` 将它们拼入 `company_context`
+4. market_analyst / fundamental_analyst 先消费同一份 `company_context`
+5. debate 层先不直接消费宏观/行业原始对象
+
+行业 thesis 读取策略：
+- 优先使用申万三级
+- 若没有则回退申万二级
+- 再回退申万一级
+
+======================
+十、company_context_assembler 的职责边界
+======================
+
+请将 `company_context_assembler` 设计为：
+
+- 一个可复用的 service
+- 再配一个薄的 LangGraph node wrapper
+
+它只做以下事情：
+- 拼公司基础标识
+- 拼 computed metrics
+- 调 concept tag extractor
+- 读取 macro constraints summary
+- 读取 industry thesis summary
+- 输出标准化 `company_context`
+
+它不负责：
+- 做最终投资结论
+- 做 bull/bear 判断
+- 直接生成自然语言研究报告
+
+======================
+十一、v1 分阶段实现建议
+======================
+
+请优先支持：
+- market_analyst
+- fundamental_analyst
+
+news_analyst / sentiment_analyst 可以先保留接口，但不要作为 v1 核心依赖。
+
+请在设计中体现：
+- 如何先让 market / fundamental analyst 消费 `company_context`
+- 如何保持 debate 层后续自然接入
+
+======================
+十二、技术要求
+======================
+
+请优先使用：
+- Python 3.11+
+- LangGraph
+- Pydantic
+- 模块化设计
+- 强类型
+- 清晰的 state / DTO / service / tool 边界
+
+建议目录结构可参考：
+
+company/
+  schemas.py
+  contracts.py
+  services/
+    company_data_service.py
+    company_context_assembler.py
+    concept_tag_extractor.py
+  tools/
+    metrics_tools.py
+  nodes/
+    build_company_context_node.py
+  analysts/
+    market_analyst.py
+    fundamental_analyst.py
+  tests/
+
+你也可以调整，但要说明理由。
+
+======================
+十三、你需要先输出的内容
+======================
+
+先不要生成完整代码。
+
+请先输出：
+
+1. 企业层重构后的整体架构
+2. `company_context` 的数据模型设计
+3. service / tool / node 的职责划分
+4. 与宏观模块、行业模块的接口关系
+5. LangGraph 中推荐的 state 设计
+6. v1 推荐实现顺序
+7. 关键 trade-offs / 风险点
+
+额外要求：
+- 这是个人投研系统 v1，不是企业级平台
+- 优先简单、可维护、可调试
+- 避免巨型文件
+- 避免把 storage / prompt / business logic 混在一起
+
+
+先不要生成完整代码。先给我 architecture / company_context contract / module boundaries / LangGraph state design / implementation order。
+
+
+
+======================
+======================
+统一 repo 结构 Prompt
+======================
+======================
+
+你是一名资深 AI 系统架构师和 Python 工程师。
+
+我已经分别完成了以下几个模块/设计的方案讨论：
+1. 宏观模块（Macro Thesis Module）
+2. 行业模块（Industry Thesis Module）
+3. 宏观模块与行业模块之间的接口关系
+4. 企业层分析模块重构（包含 company_context）
+
+现在你的任务不是生成完整业务代码，而是基于这些已确认的设计，输出一个统一的本地 Python + LangGraph repo 结构建议。
+
+目标：
+- 结构清晰
+- 模块解耦
+- 方便逐步实现
+- 方便未来扩展
+- 适合个人投研系统 v1
+- 不过度设计
+
+请注意：
+- 这是本地重构，不再依赖 n8n
+- 主要面向 A 股投研助手
+- 中文语料为主
+- 当前重点是工程骨架，而不是完整功能实现
+
+======================
+一、系统范围
+======================
+
+当前系统主要包括以下部分：
+
+1）宏观模块
+职责：
+- 维护 Macro Master Card
+- 维护 4 类子卡片（国内总量 / 政策环境 / 海外映射 / 市场风格）
+- 每日增量更新
+- 输出宏观 bias、主线、风格影响、申万一级行业映射
+- 输出 material_change
+- 服务行业模块和组合/配置判断
+
+2）行业模块
+职责：
+- 基于申万行业分类维护 Industry Thesis Card
+- 支持申万一级/二级/三级
+- 维护 bull/base/bear + current_bias
+- 支持 on-request refresh / weekly full refresh
+- 有 prioritizer 子模块决定每周更新的 5–8 个行业
+- concept tags 只是辅助标签，不是主对象
+
+3）企业层分析模块
+职责：
+- 从 ticker 出发构建 company_context
+- 通过 data service / metrics tools / concept tag extractor / context assembler
+  拼装企业分析上下文
+- market_analyst / fundamental_analyst 先消费 company_context
+- debate 层后续消费 analyst 输出
+
+4）模块接口关系
+- 宏观模块 -> 行业模块 -> 企业层
+- 企业层通过 company_context 读取压缩版宏观/行业摘要
+- 模块之间通过 contract / DTO 解耦
+- 避免循环依赖
+
+======================
+二、repo 结构目标
+======================
+
+请输出一个统一 repo 结构建议，要求：
+
+- 明确 macro / industry / company 的边界
+- 明确 contracts / integration / shared 的职责
+- 明确 service / tool / node / repository / prompt 的分层
+- 明确依赖方向
+- 方便后续逐步补实现
+- 避免把全部逻辑堆到单个目录或单个文件
+
+======================
+三、设计原则
+======================
+
+请遵循以下原则：
+
+1. 宏观、行业、企业层各自维护自己的状态与逻辑
+2. 共享契约单独抽离，不直接共享内部模型
+3. service / tool / LangGraph node 分层明确
+4. repository / storage 与业务逻辑分离
+5. prompt 与业务逻辑分离
+6. state / DTO / domain model 尽量清晰
+7. 优先支持 v1 的最小闭环
+8. 不要过度平台化
+
+======================
+四、你需要覆盖的目录层
+======================
+
+请至少考虑是否需要如下层次（你可以调整，但要说明理由）：
+
+- macro/
+- industry/
+- company/
+- contracts/
+- integration/
+- shared/
+- app/ 或 api/
+- tests/
+- scripts/
+
+并进一步细分每层职责，例如：
+
+- schemas / models / contracts
+- services
+- tools
+- nodes
+- repositories
+- retrievers
+- prompts
+- mappers
+- prioritizers
+- schedulers
+
+======================
+五、特别要求
+======================
+
+请重点说明以下问题：
+
+1. `contracts/` 是否应单独存在？
+如果存在，应放哪些内容？
+例如：
+- Macro summary DTO
+- Industry summary DTO
+- Company context contract
+- shared enums / version fields / source ref structures
+
+2. `integration/` 是否应单独存在？
+如果存在，应放哪些内容？
+例如：
+- macro -> industry bridge
+- company context assembly orchestration
+- shared context injection logic
+
+3. LangGraph 相关代码放在哪里最合理？
+例如：
+- 每个模块下各自放 nodes / graph pieces
+- 还是单独放 graphs/
+
+4. prompt 文件放在哪里最合理？
+例如：
+- 各模块内部各自管理
+- 还是统一抽取
+
+5. 测试结构如何按模块划分？
+
+======================
+六、输出要求
+======================
+
+请先输出：
+
+1. 推荐的 repo 顶层目录结构
+2. 每个目录/子目录的职责说明
+3. 推荐的依赖方向（谁可以依赖谁，谁不能依赖谁）
+4. 推荐的 contract / DTO 放置方式
+5. 推荐的 integration layer 设计
+6. 推荐的 LangGraph 代码组织方式
+7. 推荐的实现顺序（按模块）
+8. 哪些地方最容易过度设计，需要刻意避免
+
+请先不要生成完整代码。
+如果需要举例，可以给少量文件名示例，但不要直接展开成大段实现代码。
+
+额外要求：
+- 这是个人投研系统 v1，不是企业级平台
+- 优先简单、清晰、可调试
+- 避免巨型文件
+- 避免 storage / prompt / business logic 混在一起
+
+先不要生成完整代码。先给我 repo tree / directory responsibilities / dependency direction / contracts & integration placement
+
+
+======================
+======================
+统一 contracts / DTO
+======================
+======================
+
+
+重点统一：
+version
+时间字段
+delta 表达
+source_refs
+confidence
+material_change
+bias / mapping 枚举
+
+
+======================
+======================
+第一版 skeleton 代码的 Prompt
+======================
+======================
+
+
+你是一名资深 AI 系统架构师和 Python 工程师。
+
+基于我们已经确认的以下设计：
+1. 宏观模块（Macro Thesis Module）
+2. 行业模块（Industry Thesis Module）
+3. 宏观模块与行业模块之间的接口关系
+4. 企业层分析模块重构（包含 company_context）
+5. 统一 repo 结构
+
+现在请你开始生成“第一版 skeleton 代码”。
+
+注意：
+- 目标不是完整实现所有业务逻辑
+- 目标是先把工程骨架、数据契约、模块边界、依赖方向搭好
+- 这是个人投研系统 v1，不是企业级平台
+- 优先简单、清晰、可调试、可扩展
+- 避免巨型文件
+- 避免 storage / prompt / business logic 混在一起
+
+======================
+一、生成目标
+======================
+
+请生成一个“最小但结构正确”的 skeleton，包括：
+
+1. 顶层目录与基础文件
+2. contracts / DTOs
+3. Pydantic schemas / models
+4. repository interfaces
+5. service interfaces
+6. tool interfaces
+7. LangGraph node skeletons
+8. integration layer skeletons
+9. 基础 README
+10. pyproject.toml
+11. .env.example
+12. 少量测试 skeleton
+
+请不要实现复杂业务逻辑。
+请不要生成大段 placeholder 文本。
+请优先保证：
+- 类型清晰
+- 结构清晰
+- 依赖方向正确
+- 模块边界稳定
+
+======================
+二、生成范围
+======================
+
+请覆盖以下模块：
+
+1）macro/
+- Macro Master Card
+- 子卡片 schema
+- updater skeleton
+- mapper skeleton
+- repository interface
+- service interface
+- node skeleton
+
+2）industry/
+- Industry Thesis Card
+- thesis repository interface
+- updater skeleton
+- prioritizer skeleton
+- scheduler skeleton
+- service interface
+- node skeleton
+
+3）company/
+- company_context contract / schema
+- company_data_service interface
+- company_context_assembler interface + skeleton
+- concept_tag_extractor interface + skeleton
+- metrics_tools interface + skeleton
+- market_analyst / fundamental_analyst skeleton
+- build_company_context node skeleton
+
+4）contracts/
+- Macro summary DTO
+- Industry summary DTO
+- Company context contract
+- shared enums / shared types / source refs / version fields
+
+5）integration/
+- macro -> industry bridge skeleton
+- company context assembly orchestration skeleton
+- shared contract adapters if needed
+
+6）shared/
+- common types
+- config skeleton
+- logging skeleton
+- utility helpers（仅少量）
+
+7）tests/
+- 按模块分目录
+- 每个模块至少有一个最小测试 skeleton
+
+======================
+三、明确不要做的事
+======================
+
+当前不要实现：
+
+- 完整数据库读写细节
+- 完整向量库接入
+- 真实外部数据源适配器
+- 复杂 prompt 文本
+- 完整 LangGraph 图编排
+- 完整调度系统
+- 完整分析逻辑
+- 完整 debate 逻辑
+- 复杂 agent tool calling 流程
+
+当前只需要：
+- 类型定义
+- 抽象接口
+- 最小类/函数骨架
+- 少量 TODO 注释
+- 少量示例方法签名
+
+======================
+四、代码风格要求
+======================
+
+请遵循：
+
+- Python 3.11+
+- 使用 Pydantic
+- 使用类型注解
+- 使用 dataclass / BaseModel / Protocol / ABC 等合适抽象
+- 命名清晰
+- 文件尽量小
+- 每个文件职责单一
+- 避免为了“完整”而过度生成代码
+
+======================
+五、输出方式
+======================
+
+请按以下顺序输出：
+
+1. 顶层目录树
+2. 每个关键文件的职责
+3. skeleton 代码（分文件给出）
+4. README（简版）
+5. pyproject.toml
+6. .env.example
+7. 测试 skeleton
+
+如果内容较多，请优先生成：
+- contracts/
+- macro/ 的 schema + interfaces
+- industry/ 的 schema + interfaces
+- company/ 的 company_context + interfaces
+- integration/ skeleton
+
+
+如果你认为需要分批生成，请明确给出推荐的分批顺序。
+
+请开始。

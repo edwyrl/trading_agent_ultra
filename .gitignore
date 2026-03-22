@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# Test / cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Env files
+.env
+
+# Local pyc cache prefix
+/tmp/python_cache/
+
+# Local logs / artifacts
+*.log
+
+# Optional local data
+local_data/
