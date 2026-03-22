@@ -13,7 +13,7 @@ class IndustrySummaryTool:
         self,
         industry_id: str,
         preferred_levels: list[SwLevel] | None = None,
-    ) -> IndustryThesisSummaryDTO:
+    ) -> IndustryThesisSummaryDTO | None:
         return self.provider.get_industry_thesis_summary(
             industry_id=industry_id,
             preferred_levels=preferred_levels,

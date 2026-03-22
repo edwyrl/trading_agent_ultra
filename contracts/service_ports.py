@@ -6,11 +6,13 @@ from typing import Protocol
 from contracts.company_contracts import CompanyContextDTO
 from contracts.enums import SwLevel
 from contracts.industry_contracts import IndustryThesisSummaryDTO
-from contracts.macro_contracts import MacroConstraintsSummaryDTO
+from contracts.macro_contracts import MacroConstraintsSummaryDTO, MacroIndustryMappingDTO
 
 
 class MacroSummaryProvider(Protocol):
-    def get_macro_constraints_summary(self, as_of_date: date | None = None) -> MacroConstraintsSummaryDTO: ...
+    def get_macro_constraints_summary(self, as_of_date: date | None = None) -> MacroConstraintsSummaryDTO | None: ...
+
+    def get_macro_industry_mappings(self, version: str | None = None) -> list[MacroIndustryMappingDTO]: ...
 
 
 class IndustrySummaryProvider(Protocol):
@@ -18,7 +20,7 @@ class IndustrySummaryProvider(Protocol):
         self,
         industry_id: str,
         preferred_levels: list[SwLevel] | None = None,
-    ) -> IndustryThesisSummaryDTO: ...
+    ) -> IndustryThesisSummaryDTO | None: ...
 
 
 class CompanyContextBuilder(Protocol):
