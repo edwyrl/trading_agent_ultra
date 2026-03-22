@@ -20,3 +20,18 @@ def derive_macro_constraints_for_industry(
         constraint_reason=reason,
         macro_version_ref=macro_summary.version,
     )
+
+
+def derive_macro_constraints_map(
+    sw_l1_ids: list[str],
+    macro_summary: MacroConstraintsSummaryDTO,
+    mappings: list[MacroIndustryMappingDTO],
+) -> dict[str, MacroIndustryConstraintDTO]:
+    return {
+        sw_l1_id: derive_macro_constraints_for_industry(
+            sw_l1_id=sw_l1_id,
+            macro_summary=macro_summary,
+            mappings=mappings,
+        )
+        for sw_l1_id in sw_l1_ids
+    }
