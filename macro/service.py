@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from datetime import date
 
-from contracts.macro_contracts import MacroConstraintsSummaryDTO, MacroDeltaDTO, MacroMasterCardDTO
+from contracts.macro_contracts import (
+    MacroConstraintsSummaryDTO,
+    MacroDeltaDTO,
+    MacroIndustryMappingDTO,
+    MacroMasterCardDTO,
+)
 from macro.repository import MacroRepository
 from macro.retriever import MacroEvent
 from macro.updater import MacroUpdater
@@ -25,6 +30,9 @@ class MacroService:
         since_date: date | None = None,
     ) -> list[MacroDeltaDTO]:
         return self.repository.list_deltas(since_version=since_version, since_date=since_date)
+
+    def get_macro_industry_mappings(self, version: str | None = None) -> list[MacroIndustryMappingDTO]:
+        return self.repository.list_industry_mappings(version=version)
 
     def run_daily_incremental_update(
         self,

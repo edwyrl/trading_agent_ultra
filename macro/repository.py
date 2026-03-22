@@ -39,6 +39,8 @@ class MacroRepository(Protocol):
 
     def list_deltas(self, since_version: str | None = None, since_date: date | None = None) -> list[MacroDeltaDTO]: ...
 
+    def list_industry_mappings(self, version: str | None = None) -> list[MacroIndustryMappingDTO]: ...
+
 
 class PostgresMacroRepository:
     def __init__(self, session: Session):
@@ -127,3 +129,16 @@ class PostgresMacroRepository:
             query = query.where(MacroDeltaModel.as_of_date >= since_date)
         rows = self.session.execute(query.order_by(MacroDeltaModel.as_of_date.desc())).scalars().all()
         return [MacroDeltaDTO.model_validate(row.payload) for row in rows]
+
+    def list_industry_mappings(self, version: str | None = None) -> list[MacroIndustryMappingDTO]:
+        query = select(MacroIndustryMappingSnapshotModel)
+        if version:
+            query = query.where(MacroIndustryMappingSnapshotModel.version == version)
+        else:
+            latest_master = self.get_latest_master()
+            if not latest_master:
+                return []
+            query = query.where(MacroIndustryMappingSnapshotModel.version == latest_master.version)
+
+        rows = self.session.execute(query.order_by(MacroIndustryMappingSnapshotModel.sw_l1_id.asc())).scalars().all()
+        return [MacroIndustryMappingDTO.model_validate(row.payload) for row in rows]

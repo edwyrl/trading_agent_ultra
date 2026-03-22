@@ -21,6 +21,12 @@ class PostgresIntegrationRepository:
         self.session = session
 
     def enqueue_recheck(self, item: RecheckQueueItemDTO, reason_codes: list[str], triggered_by_macro_version: str) -> None:
+        existing = self.session.execute(
+            select(IndustryRecheckQueueModel).where(IndustryRecheckQueueModel.queue_id == item.queue_id)
+        ).scalars().first()
+        if existing:
+            return
+
         row = IndustryRecheckQueueModel(
             queue_id=item.queue_id,
             sw_l1_id=item.sw_l1_id,
@@ -34,7 +40,9 @@ class PostgresIntegrationRepository:
 
     def list_pending_rechecks(self) -> list[RecheckQueueItemDTO]:
         rows = self.session.execute(
-            select(IndustryRecheckQueueModel).where(IndustryRecheckQueueModel.status == "PENDING")
+            select(IndustryRecheckQueueModel)
+            .where(IndustryRecheckQueueModel.status == "PENDING")
+            .order_by(IndustryRecheckQueueModel.created_at.asc())
         ).scalars().all()
 
         return [
