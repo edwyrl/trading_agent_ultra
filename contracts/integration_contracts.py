@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from contracts.enums import MappingDirection, UpdateMode
 
@@ -34,4 +34,6 @@ class RecheckQueueItemDTO(BaseModel):
     industry_id: str
     recommended_mode: UpdateMode
     status: str
+    reason_codes: list[str] = Field(default_factory=list)
+    triggered_by_macro_version: str | None = None
     created_at: datetime

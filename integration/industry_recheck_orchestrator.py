@@ -92,6 +92,8 @@ class IndustryRecheckOrchestrator:
                 industry_id=decision.sw_l1_id,
                 recommended_mode=decision.recommended_mode,
                 status="PENDING",
+                reason_codes=decision.reason_codes,
+                triggered_by_macro_version=decision.triggered_by_macro_version,
                 created_at=now,
             )
             self.repository.enqueue_recheck(

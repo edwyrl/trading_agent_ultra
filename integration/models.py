@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import DateTime, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,4 +25,6 @@ class IndustryRecheckQueueModel(Base):
     status: Mapped[str] = mapped_column(String(32), index=True)
     reason_codes: Mapped[list[str]] = mapped_column(JSONB)
     triggered_by_macro_version: Mapped[str] = mapped_column(String(64), index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
