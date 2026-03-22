@@ -14,6 +14,10 @@ This repository contains a modular Python + LangGraph skeleton for an A-share re
 - `SUPABASE_SCHEMA`
 - `APP_ENV`
 
+Recommended `SUPABASE_DB_URL` format for v1:
+- Use Supabase Session Pooler (port `6543`) with `sslmode=require`.
+- Example: `postgresql+psycopg://postgres.<project-ref>:<password>@<pooler-host>:6543/postgres?sslmode=require`
+
 ## Modules
 - `macro/`: macro thesis snapshots, deltas, mappings, daily run logs.
 - `industry/`: industry thesis snapshots/latest, deltas, refresh metadata.

@@ -4,7 +4,7 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from shared.config import settings
 from shared.db.base import Base
@@ -64,12 +64,15 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        schema = _schema()
+        connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
+        connection.commit()
         context.configure(
             connection=connection,
             target_metadata=Base.metadata,
             include_schemas=True,
             include_object=include_object,
-            version_table_schema=_schema(),
+            version_table_schema=schema,
         )
 
         with context.begin_transaction():

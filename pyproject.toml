@@ -28,6 +28,10 @@ dev = [
 [tool.setuptools]
 include-package-data = true
 
+[tool.setuptools.packages.find]
+include = ["app*", "contracts*", "shared*", "macro*", "industry*", "company*", "integration*", "graphs*"]
+exclude = ["tests*", "scripts*", "alembic*", "trading_agent_env*"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
