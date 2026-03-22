@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date
+
+import pytest
 
 from company.services.company_context_assembler import CompanyContextAssembler
 from company.services.company_data_service import CompanyDataService
@@ -75,6 +77,7 @@ class StubIndustryProvider:
 class StubCompanyRepository:
     def __init__(self) -> None:
         self.saved: CompanyContextDTO | None = None
+        self.runs: list[dict] = []
 
     def save_company_context(self, context: CompanyContextDTO) -> None:
         self.saved = context
@@ -84,7 +87,7 @@ class StubCompanyRepository:
         return self.saved
 
     def save_analysis_run(self, payload: dict) -> None:
-        _ = payload
+        self.runs.append(payload)
 
     def save_analyst_output(self, payload: dict) -> None:
         _ = payload
@@ -118,6 +121,9 @@ def test_company_context_orchestrator_builds_and_saves_context() -> None:
     assert repo.saved is not None
     assert repo.saved.context_version == context.context_version
     assert context.computed_metrics.highlight_flags == []
+    assert len(repo.runs) == 1
+    assert repo.runs[0]["status"] == "SUCCESS"
+    assert repo.runs[0]["context_version"] == context.context_version
 
 
 def test_company_context_uses_fallbacks_when_macro_and_industry_missing() -> None:
@@ -155,3 +161,27 @@ def test_company_context_uses_fallbacks_when_macro_and_industry_missing() -> Non
     assert context.industry_thesis_summary.current_bias == IndustryScenarioBias.BASE
     assert context.macro_constraints_summary.industry_mapping_signal_for_company.direction == MappingDirection.NEUTRAL
     assert context.context_as_of_date == date(2026, 3, 22)
+
+
+def test_company_context_orchestrator_records_failed_run() -> None:
+    class FailingMetricsTools(MetricsTools):
+        def compute(self, market_data: dict, financial_data: dict):  # type: ignore[override]
+            _ = (market_data, financial_data)
+            raise RuntimeError("metrics failed")
+
+    repo = StubCompanyRepository()
+    orchestrator = CompanyContextOrchestrator(
+        company_data_service=CompanyDataService(),
+        metrics_tools=FailingMetricsTools(),
+        concept_tag_extractor=StubTagExtractor(),
+        macro_constraints_tool=MacroConstraintsTool(provider=StubMacroProvider()),
+        industry_summary_tool=IndustrySummaryTool(provider=StubIndustryProvider()),
+        assembler=CompanyContextAssembler(),
+        repository=repo,
+    )
+
+    with pytest.raises(RuntimeError, match="metrics failed"):
+        orchestrator.build(ts_code="000001.SZ", trade_date=date(2026, 3, 22))
+
+    assert len(repo.runs) == 1
+    assert repo.runs[0]["status"] == "FAILED"

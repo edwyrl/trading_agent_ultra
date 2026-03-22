@@ -62,6 +62,19 @@ class StubIndustryService:
         self.calls.append((industry_id, mode))
 
 
+class FlakyIndustryService(StubIndustryService):
+    def __init__(self, fail_times: int) -> None:
+        super().__init__()
+        self.fail_times = fail_times
+        self.attempts = 0
+
+    def refresh_industry_thesis(self, industry_id: str, mode: UpdateMode) -> None:
+        self.attempts += 1
+        if self.attempts <= self.fail_times:
+            raise RuntimeError("temporary upstream failure")
+        super().refresh_industry_thesis(industry_id, mode)
+
+
 def _delta(material: bool, level: MaterialChangeLevel, to_version: str) -> MacroDeltaDTO:
     return MacroDeltaDTO(
         delta_id=f"macro-delta:{to_version}",
@@ -126,6 +139,33 @@ def test_recheck_executor_marks_done() -> None:
 
     industry_service = StubIndustryService()
     executor = IndustryRecheckExecutor(repository=repo, industry_service=industry_service)
+
+    stats = executor.run_pending()
+
+    assert stats == {"total": 1, "done": 1, "failed": 0}
+    assert industry_service.calls == [("801010", UpdateMode.MARKET)]
+    assert repo.items[item.queue_id].status == "DONE"
+
+
+def test_recheck_executor_retries_then_succeeds() -> None:
+    repo = InMemoryIntegrationRepository()
+    item = RecheckQueueItemDTO(
+        queue_id="rq:test:801010",
+        sw_l1_id="801010",
+        industry_id="801010",
+        recommended_mode=UpdateMode.MARKET,
+        status="PENDING",
+        created_at=datetime.now(UTC),
+    )
+    repo.items[item.queue_id] = item
+
+    industry_service = FlakyIndustryService(fail_times=2)
+    executor = IndustryRecheckExecutor(
+        repository=repo,
+        industry_service=industry_service,
+        max_attempts=3,
+        initial_delay_seconds=0.0,
+    )
 
     stats = executor.run_pending()
 
