@@ -5,6 +5,8 @@ from datetime import UTC, date, datetime
 from contracts.macro_contracts import (
     MacroConstraintsSummaryDTO,
     MacroDeltaDTO,
+    MacroEventHistoryDTO,
+    MacroEventViewDTO,
     MacroIndustryMappingDTO,
     MacroMasterCardDTO,
     MacroThemeCardSummaryDTO,
@@ -22,6 +24,8 @@ class InMemoryMacroRepository:
         self.deltas: list[MacroDeltaDTO] = []
         self.mappings: list[tuple[str, date, MacroIndustryMappingDTO]] = []
         self.run_logs: list[dict] = []
+        self.event_history: list[MacroEventHistoryDTO] = []
+        self.event_views: list[MacroEventViewDTO] = []
 
     def save_master_snapshot(self, master: MacroMasterCardDTO) -> None:
         self.master_snapshots.append(master)
@@ -37,6 +41,16 @@ class InMemoryMacroRepository:
 
     def save_run_log(self, payload: dict) -> None:
         self.run_logs.append(payload)
+
+    def next_event_seq(self, event_id: str) -> int:
+        seqs = [h.event_seq for h in self.event_history if h.event_id == event_id]
+        return (max(seqs) if seqs else 0) + 1
+
+    def save_event_history(self, event: MacroEventHistoryDTO) -> None:
+        self.event_history.append(event)
+
+    def save_event_view(self, view: MacroEventViewDTO) -> None:
+        self.event_views.append(view)
 
     def get_latest_master(self, as_of_date: date | None = None) -> MacroMasterCardDTO | None:
         if not self.master_snapshots:
@@ -65,6 +79,39 @@ class InMemoryMacroRepository:
     def list_deltas(self, since_version: str | None = None, since_date: date | None = None) -> list[MacroDeltaDTO]:
         _ = (since_version, since_date)
         return self.deltas
+
+    def list_industry_mappings(self, version: str | None = None) -> list[MacroIndustryMappingDTO]:
+        if version is None:
+            if not self.mappings:
+                return []
+            version = self.mappings[-1][0]
+        return [m for v, _, m in self.mappings if v == version]
+
+    def list_latest_event_history(self, as_of_date: date | None = None) -> list[MacroEventHistoryDTO]:
+        latest: dict[str, MacroEventHistoryDTO] = {}
+        for row in self.event_history:
+            if as_of_date and row.as_of_date > as_of_date:
+                continue
+            current = latest.get(row.event_id)
+            if current is None or row.event_seq > current.event_seq:
+                latest[row.event_id] = row
+        return sorted(latest.values(), key=lambda x: (x.as_of_date, x.created_at), reverse=True)
+
+    def list_event_views(
+        self,
+        *,
+        history_ids: list[str] | None = None,
+        event_ids: list[str] | None = None,
+        as_of_date: date | None = None,
+    ) -> list[MacroEventViewDTO]:
+        rows = self.event_views
+        if history_ids:
+            rows = [r for r in rows if r.history_id in history_ids]
+        if event_ids:
+            rows = [r for r in rows if r.event_id in event_ids]
+        if as_of_date:
+            rows = [r for r in rows if r.as_of_date <= as_of_date]
+        return sorted(rows, key=lambda x: x.created_at, reverse=True)
 
 
 def _event(event_id: str, title: str, summary: str, theme_type: str, bias_hint: str | None = None) -> MacroEvent:
@@ -97,6 +144,8 @@ def test_macro_updater_creates_master_theme_delta_mapping() -> None:
     assert len(repo.deltas) == 1
     assert len(repo.mappings) > 0
     assert repo.run_logs[-1]["status"] == "SUCCESS"
+    assert len(repo.event_history) == 2
+    assert len(repo.event_views) == 2
 
 
 def test_macro_updater_with_no_new_events_keeps_bias_and_no_material_change() -> None:
@@ -130,6 +179,32 @@ def test_macro_service_can_run_incremental_update() -> None:
 
     assert service.get_macro_master_card(as_of_date=date(2026, 3, 24)) is not None
     assert master.version == repo.master_snapshots[-1].version
+
+
+def test_macro_event_history_links_to_views_and_snapshot_evidence() -> None:
+    repo = InMemoryMacroRepository()
+    updater = MacroUpdater(repository=repo)
+
+    updater.run_daily_incremental_update(
+        as_of_date=date(2026, 3, 22),
+        events=[
+            _event("evt-link-1", "政策预期提升", "政策预期强化，风险偏好修复", "POLICY_ENVIRONMENT"),
+        ],
+    )
+    master = updater.run_daily_incremental_update(
+        as_of_date=date(2026, 3, 23),
+        events=[
+            _event("evt-link-1", "政策继续推进", "政策继续推进并逐步确认", "POLICY_ENVIRONMENT"),
+        ],
+    )
+
+    assert len([h for h in repo.event_history if h.event_id == "evt-link-1"]) == 2
+    latest = repo.list_latest_event_history(as_of_date=date(2026, 3, 23))[0]
+    assert latest.event_seq == 2
+    assert latest.history_id.endswith(":002")
+    assert master.evidence_event_ids
+    assert "evt-link-1" in master.evidence_event_ids
+    assert master.evidence_view_ids
 
 
 def test_source_ref_structure_is_serializable() -> None:

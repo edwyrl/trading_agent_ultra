@@ -28,6 +28,20 @@ class MacroThemeType(StrEnum):
     MARKET_STYLE = "MARKET_STYLE"
 
 
+class MacroEventStatus(StrEnum):
+    NEW = "NEW"
+    DEVELOPING = "DEVELOPING"
+    CONFIRMED = "CONFIRMED"
+    RESOLVED = "RESOLVED"
+    INVALIDATED = "INVALIDATED"
+
+
+class MacroEventViewType(StrEnum):
+    SOURCE = "SOURCE"
+    AGENT = "AGENT"
+    MANUAL = "MANUAL"
+
+
 class ConfidenceLevel(StrEnum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"

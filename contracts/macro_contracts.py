@@ -6,7 +6,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from contracts.confidence import ConfidenceDTO
 from contracts.delta import DeltaDTO
-from contracts.enums import MacroBiasTag, MacroThemeType, MappingDirection
+from contracts.enums import (
+    MacroBiasTag,
+    MacroEventStatus,
+    MacroEventViewType,
+    MacroThemeType,
+    MappingDirection,
+)
 from contracts.material_change import MaterialChangeDTO
 from contracts.source_refs import SourceRefDTO
 
@@ -37,6 +43,8 @@ class MacroThemeCardSummaryDTO(BaseModel):
     reasoning: str
     source_refs: list[SourceRefDTO]
     confidence: ConfidenceDTO
+    evidence_event_ids: list[str] = Field(default_factory=list)
+    evidence_view_ids: list[str] = Field(default_factory=list)
 
 
 class MacroMasterCardDTO(BaseModel):
@@ -60,6 +68,8 @@ class MacroMasterCardDTO(BaseModel):
     source_refs: list[SourceRefDTO]
     confidence: ConfidenceDTO
     material_change: MaterialChangeDTO
+    evidence_event_ids: list[str] = Field(default_factory=list)
+    evidence_view_ids: list[str] = Field(default_factory=list)
 
 
 class MacroConstraintsSummaryDTO(BaseModel):
@@ -76,3 +86,35 @@ class MacroConstraintsSummaryDTO(BaseModel):
 
 class MacroDeltaDTO(DeltaDTO):
     model_config = ConfigDict(extra="forbid")
+
+
+class MacroEventHistoryDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    history_id: str
+    event_id: str
+    event_seq: int
+    as_of_date: date
+    event_status: MacroEventStatus
+    title: str
+    fact_summary: str
+    theme_type: MacroThemeType
+    bias_hint: MacroBiasTag | None = None
+    source_refs: list[SourceRefDTO] = Field(default_factory=list)
+    created_at: datetime
+
+
+class MacroEventViewDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    view_id: str
+    event_id: str
+    history_id: str
+    as_of_date: date
+    view_type: MacroEventViewType
+    stance: MappingDirection
+    view_text: str
+    score: float = Field(ge=0.0, le=1.0)
+    score_reason: str | None = None
+    source_refs: list[SourceRefDTO] = Field(default_factory=list)
+    created_at: datetime

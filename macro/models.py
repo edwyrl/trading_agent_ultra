@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Boolean, Date, DateTime, Float, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -84,4 +84,43 @@ class MacroRunLogModel(Base):
     material_change: Mapped[bool] = mapped_column(Boolean)
     status: Mapped[str] = mapped_column(String(32))
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class MacroEventHistoryModel(Base):
+    __tablename__ = "macro_event_history"
+    __table_args__ = (
+        UniqueConstraint("event_id", "event_seq", name="uq_macro_event_history_event_seq"),
+        {"schema": _SCHEMA},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    history_id: Mapped[str] = mapped_column(String(96), unique=True, index=True)
+    event_id: Mapped[str] = mapped_column(String(96), index=True)
+    event_seq: Mapped[int] = mapped_column(Integer)
+    as_of_date: Mapped[Date] = mapped_column(Date, index=True)
+    event_status: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(Text)
+    fact_summary: Mapped[str] = mapped_column(Text)
+    theme_type: Mapped[str] = mapped_column(String(64), index=True)
+    bias_hint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_refs: Mapped[list[dict]] = mapped_column(JSONB)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class MacroEventViewModel(Base):
+    __tablename__ = "macro_event_views"
+    __table_args__ = {"schema": _SCHEMA}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    view_id: Mapped[str] = mapped_column(String(96), unique=True, index=True)
+    event_id: Mapped[str] = mapped_column(String(96), index=True)
+    history_id: Mapped[str] = mapped_column(String(96), index=True)
+    as_of_date: Mapped[Date] = mapped_column(Date, index=True)
+    view_type: Mapped[str] = mapped_column(String(32), index=True)
+    stance: Mapped[str] = mapped_column(String(16), index=True)
+    view_text: Mapped[str] = mapped_column(Text)
+    score: Mapped[float] = mapped_column(Float)
+    score_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_refs: Mapped[list[dict]] = mapped_column(JSONB)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=utc_now)

@@ -11,10 +11,19 @@ from contracts.enums import (
     ConfidenceLevel,
     EntityType,
     MacroBiasTag,
+    MacroEventStatus,
+    MacroEventViewType,
     MacroThemeType,
+    MappingDirection,
     SourceType,
 )
-from contracts.macro_contracts import MacroDeltaDTO, MacroMasterCardDTO, MacroThemeCardSummaryDTO
+from contracts.macro_contracts import (
+    MacroDeltaDTO,
+    MacroEventHistoryDTO,
+    MacroEventViewDTO,
+    MacroMasterCardDTO,
+    MacroThemeCardSummaryDTO,
+)
 from contracts.source_refs import SourceRefDTO
 from macro.mapper import MacroIndustryMapper
 from macro.repository import MacroRepository
@@ -47,6 +56,13 @@ _THEME_SW_DEFAULT: dict[MacroThemeType, dict[str, list[str]]] = {
     },
 }
 
+_NEGATIVE_THEME_BIAS: dict[MacroThemeType, MacroBiasTag] = {
+    MacroThemeType.DOMESTIC_AGGREGATE: MacroBiasTag.DEFENSIVE_PREFERENCE_RISING,
+    MacroThemeType.POLICY_ENVIRONMENT: MacroBiasTag.DEFENSIVE_PREFERENCE_RISING,
+    MacroThemeType.OVERSEAS_MAPPING: MacroBiasTag.EXTERNAL_DISTURBANCE_DOMINANT,
+    MacroThemeType.MARKET_STYLE: MacroBiasTag.DEFENSIVE_PREFERENCE_RISING,
+}
+
 
 class MacroUpdater:
     def __init__(
@@ -67,12 +83,26 @@ class MacroUpdater:
         events: list[MacroEvent] | None = None,
     ) -> MacroMasterCardDTO:
         previous = self.repository.get_latest_master(as_of_date=as_of_date)
-        daily_events = events if events is not None else self.retriever.fetch_daily_events(as_of_date)
+        incoming_events = events if events is not None else self.retriever.fetch_daily_events(as_of_date)
+        ingested = self._persist_event_history_and_views(as_of_date=as_of_date, events=incoming_events)
 
-        grouped = self._group_events_by_theme(daily_events)
-        changed_theme_cards = self._build_theme_cards(as_of_date=as_of_date, grouped_events=grouped)
+        active_histories = self.repository.list_latest_event_history(as_of_date=as_of_date)
+        active_events = self._events_from_histories(active_histories)
+        history_ids = [h.history_id for h in active_histories]
+        active_views = self.repository.list_event_views(history_ids=history_ids, as_of_date=as_of_date)
+        view_scores = self._build_event_view_scores(active_views)
 
-        new_biases = self._derive_biases(previous_master=previous, events=daily_events)
+        today_histories = [h for h in active_histories if h.as_of_date == as_of_date]
+        today_events = self._events_from_histories(today_histories)
+        grouped = self._group_events_by_theme(today_events)
+        changed_theme_cards = self._build_theme_cards(
+            as_of_date=as_of_date,
+            grouped_events=grouped,
+            view_scores=view_scores,
+            views=active_views,
+        )
+
+        new_biases = self._derive_biases(previous_master=previous, events=active_events, view_scores=view_scores)
         mappings = self.mapper.map_to_sw_l1(biases=new_biases, theme_cards=changed_theme_cards)
         material_change = self.triggers.evaluate_material_change(
             previous_master=previous,
@@ -82,17 +112,19 @@ class MacroUpdater:
         )
 
         version = self._next_version(as_of_date=as_of_date, previous_version=previous.version if previous else None)
-        key_changes = [e.title for e in daily_events[:5]] or ["无新增高相关宏观事件，维持原判断"]
-        risk_opportunity_flags = self._extract_risk_opportunity_flags(daily_events)
+        key_changes = [e.title for e in today_events[:5]] or ["无新增高相关宏观事件，维持原判断"]
+        risk_opportunity_flags = self._extract_risk_opportunity_flags(today_events)
 
         sw_positive = [m.sw_l1_id for m in mappings if m.direction.value == "POSITIVE"]
         sw_negative = [m.sw_l1_id for m in mappings if m.direction.value == "NEGATIVE"]
         sw_neutral = [m.sw_l1_id for m in mappings if m.direction.value == "NEUTRAL"]
-        confidence = self._confidence_from_event_count(len(daily_events))
+        confidence = self._confidence_from_event_count(len(today_events))
 
-        macro_mainline = self._build_mainline(daily_events=daily_events, previous=previous)
+        macro_mainline = self._build_mainline(daily_events=today_events, previous=previous)
         style_impact = self._build_style_impact(new_biases)
-        source_refs = self._build_source_refs(daily_events=daily_events, previous=previous)
+        source_refs = self._build_source_refs(today_histories=today_histories, previous=previous)
+        evidence_event_ids = [h.event_id for h in active_histories[:50]]
+        evidence_view_ids = [v.view_id for v in active_views[:100]]
 
         master = MacroMasterCardDTO(
             version=version,
@@ -106,10 +138,12 @@ class MacroUpdater:
             sw_l1_positive=sw_positive,
             sw_l1_negative=sw_negative,
             sw_l1_neutral=sw_neutral,
-            reasoning=self._build_reasoning(previous=previous, events=daily_events, biases=new_biases),
+            reasoning=self._build_reasoning(previous=previous, events=today_events, biases=new_biases),
             source_refs=source_refs,
             confidence=confidence,
             material_change=material_change,
+            evidence_event_ids=evidence_event_ids,
+            evidence_view_ids=evidence_view_ids,
         )
 
         self.repository.save_master_snapshot(master)
@@ -126,11 +160,14 @@ class MacroUpdater:
             {
                 "run_id": f"macro-run:{as_of_date:%Y%m%d}:{uuid.uuid4().hex[:8]}",
                 "as_of_date": as_of_date,
-                "event_count": len(daily_events),
+                "event_count": len(today_events),
                 "changed_theme_count": len(changed_theme_cards),
                 "material_change": material_change.material_change,
                 "status": "SUCCESS",
-                "note": f"themes={','.join(t.theme_type.value for t in changed_theme_cards)}",
+                "note": (
+                    f"themes={','.join(t.theme_type.value for t in changed_theme_cards)};"
+                    f"ingested_histories={ingested['history_count']};ingested_views={ingested['view_count']}"
+                ),
             }
         )
 
@@ -146,8 +183,13 @@ class MacroUpdater:
         self,
         as_of_date: date,
         grouped_events: dict[MacroThemeType, list[MacroEvent]],
+        view_scores: dict[str, dict[str, float]],
+        views: list[MacroEventViewDTO],
     ) -> list[MacroThemeCardSummaryDTO]:
         cards: list[MacroThemeCardSummaryDTO] = []
+        view_ids_by_event: dict[str, list[str]] = defaultdict(list)
+        for view in views:
+            view_ids_by_event[view.event_id].append(view.view_id)
         for theme, events in grouped_events.items():
             defaults = _THEME_SW_DEFAULT.get(theme, {"positive": [], "negative": []})
             source_refs = [
@@ -164,12 +206,17 @@ class MacroUpdater:
             ]
             risks = [e.title for e in events if any(k in (e.summary + e.title) for k in ["风险", "下行", "扰动", "不确定"])]
             drivers = [e.summary or e.title for e in events[:4]]
+            evidence_event_ids = [e.event_id for e in events]
+            evidence_view_ids: list[str] = []
+            for event in events:
+                evidence_view_ids.extend(view_ids_by_event.get(event.event_id, []))
+            avg_view_score = self._average_theme_view_score(events=events, view_scores=view_scores)
 
             cards.append(
                 MacroThemeCardSummaryDTO(
                     theme_type=theme,
                     as_of_date=as_of_date,
-                    current_view=f"{theme.value}：{'；'.join(e.title for e in events[:2])}",
+                    current_view=f"{theme.value}：{'；'.join(e.title for e in events[:2])}（观点强度{avg_view_score:.2f}）",
                     latest_changes=[e.title for e in events[:5]],
                     drivers=drivers,
                     risks=risks[:4],
@@ -180,6 +227,8 @@ class MacroUpdater:
                     reasoning=f"基于{len(events)}条事件进行{theme.value}增量更新。",
                     source_refs=source_refs,
                     confidence=self._confidence_from_event_count(len(events)),
+                    evidence_event_ids=evidence_event_ids,
+                    evidence_view_ids=evidence_view_ids[:50],
                 )
             )
         return cards
@@ -188,17 +237,28 @@ class MacroUpdater:
         self,
         previous_master: MacroMasterCardDTO | None,
         events: list[MacroEvent],
+        view_scores: dict[str, dict[str, float]] | None = None,
     ) -> list[MacroBiasTag]:
         if not events:
             if previous_master:
                 return previous_master.current_macro_bias
             return [MacroBiasTag.POLICY_EXPECTATION_DOMINANT]
 
+        score_map = view_scores or {}
         counter: Counter[MacroBiasTag] = Counter()
         for event in events:
             if event.bias_hint:
                 counter[event.bias_hint] += 2
-            counter[_THEME_BIAS_DEFAULT[event.theme_type]] += 1
+            base_bias = _THEME_BIAS_DEFAULT[event.theme_type]
+            counter[base_bias] += 1
+            view = score_map.get(event.event_id)
+            if view:
+                net = view["net"]
+                strength = max(0.5, min(view["strength"], 2.0))
+                if net >= 0.2:
+                    counter[base_bias] += strength
+                elif net <= -0.2:
+                    counter[_NEGATIVE_THEME_BIAS[event.theme_type]] += strength
 
         if previous_master:
             for bias in previous_master.current_macro_bias:
@@ -235,23 +295,23 @@ class MacroUpdater:
 
     def _build_source_refs(
         self,
-        daily_events: list[MacroEvent],
+        today_histories: list[MacroEventHistoryDTO],
         previous: MacroMasterCardDTO | None,
     ) -> list[SourceRefDTO]:
-        if daily_events:
+        if today_histories:
             refs: list[SourceRefDTO] = []
-            for event in daily_events[:8]:
-                refs.append(
-                    SourceRefDTO(
-                        source_type=event.source_type,
-                        title=event.title,
-                        retrieved_at=datetime.now(UTC),
-                        source_id=event.source_id,
-                        url=event.url,
-                        published_at=event.published_at,
-                        provider=event.provider,
+            for history in today_histories[:8]:
+                if history.source_refs:
+                    refs.extend(history.source_refs[:2])
+                else:
+                    refs.append(
+                        SourceRefDTO(
+                            source_type=SourceType.INTERNAL_SUMMARY,
+                            title=history.title,
+                            retrieved_at=datetime.now(UTC),
+                            note="No source refs in event history",
+                        )
                     )
-                )
             return refs
         if previous:
             return previous.source_refs
@@ -360,3 +420,149 @@ class MacroUpdater:
         except ValueError:
             seq = 1
         return f"{prefix}{seq:02d}"
+
+    def _events_from_histories(self, histories: list[MacroEventHistoryDTO]) -> list[MacroEvent]:
+        events: list[MacroEvent] = []
+        for history in histories:
+            first_ref = history.source_refs[0] if history.source_refs else None
+            events.append(
+                MacroEvent(
+                    event_id=history.event_id,
+                    title=history.title,
+                    summary=history.fact_summary,
+                    theme_type=history.theme_type,
+                    source_type=first_ref.source_type if first_ref else SourceType.INTERNAL_SUMMARY,
+                    published_at=first_ref.published_at if first_ref else None,
+                    url=first_ref.url if first_ref else None,
+                    source_id=first_ref.source_id if first_ref else history.history_id,
+                    provider=first_ref.provider if first_ref else "macro_event_history",
+                    bias_hint=history.bias_hint,
+                )
+            )
+        return events
+
+    def _persist_event_history_and_views(self, as_of_date: date, events: list[MacroEvent]) -> dict[str, int]:
+        if not events:
+            return {"history_count": 0, "view_count": 0}
+
+        deduped: dict[str, MacroEvent] = {}
+        for event in events:
+            deduped[event.event_id] = event
+
+        history_count = 0
+        view_count = 0
+        now = datetime.now(UTC)
+        for event_id in sorted(deduped):
+            event = deduped[event_id]
+            seq = self.repository.next_event_seq(event.event_id)
+            history_id = f"meh:{event.event_id}:{seq:03d}"
+            source_refs = self._source_refs_from_event(event, retrieved_at=now)
+
+            history = MacroEventHistoryDTO(
+                history_id=history_id,
+                event_id=event.event_id,
+                event_seq=seq,
+                as_of_date=as_of_date,
+                event_status=self._infer_event_status(event=event, event_seq=seq),
+                title=event.title,
+                fact_summary=event.summary or event.title,
+                theme_type=event.theme_type,
+                bias_hint=event.bias_hint,
+                source_refs=source_refs,
+                created_at=now,
+            )
+            self.repository.save_event_history(history)
+            history_count += 1
+
+            view = MacroEventViewDTO(
+                view_id=f"mev:{history_id}:source",
+                event_id=event.event_id,
+                history_id=history.history_id,
+                as_of_date=as_of_date,
+                view_type=MacroEventViewType.SOURCE,
+                stance=self._infer_view_stance(event),
+                view_text=event.summary or event.title,
+                score=self._infer_view_score(event),
+                score_reason="AUTO_SOURCE_VIEW",
+                source_refs=source_refs,
+                created_at=now,
+            )
+            self.repository.save_event_view(view)
+            view_count += 1
+        return {"history_count": history_count, "view_count": view_count}
+
+    def _source_refs_from_event(self, event: MacroEvent, *, retrieved_at: datetime) -> list[SourceRefDTO]:
+        return [
+            SourceRefDTO(
+                source_type=event.source_type,
+                title=event.title,
+                retrieved_at=retrieved_at,
+                source_id=event.source_id or event.event_id,
+                url=event.url,
+                published_at=event.published_at,
+                provider=event.provider,
+            )
+        ]
+
+    def _infer_event_status(self, event: MacroEvent, event_seq: int) -> MacroEventStatus:
+        text = f"{event.title}{event.summary}"
+        if any(k in text for k in ["证伪", "辟谣", "失效"]):
+            return MacroEventStatus.INVALIDATED
+        if any(k in text for k in ["落地", "确认", "实施"]):
+            return MacroEventStatus.CONFIRMED
+        if any(k in text for k in ["缓和", "结束", "消退"]):
+            return MacroEventStatus.RESOLVED
+        if event_seq == 1:
+            return MacroEventStatus.NEW
+        return MacroEventStatus.DEVELOPING
+
+    def _infer_view_stance(self, event: MacroEvent) -> MappingDirection:
+        text = f"{event.title}{event.summary}"
+        if any(k in text for k in ["下行", "扰动", "风险", "承压", "走弱"]):
+            return MappingDirection.NEGATIVE
+        if any(k in text for k in ["改善", "修复", "回升", "利好", "强化"]):
+            return MappingDirection.POSITIVE
+        return MappingDirection.NEUTRAL
+
+    def _infer_view_score(self, event: MacroEvent) -> float:
+        stance = self._infer_view_stance(event)
+        if stance == MappingDirection.NEUTRAL:
+            return 0.5
+        return 0.65
+
+    def _build_event_view_scores(self, views: list[MacroEventViewDTO]) -> dict[str, dict[str, float]]:
+        by_event: dict[str, list[MacroEventViewDTO]] = defaultdict(list)
+        for view in views:
+            by_event[view.event_id].append(view)
+
+        result: dict[str, dict[str, float]] = {}
+        sign_map = {
+            MappingDirection.POSITIVE: 1.0,
+            MappingDirection.NEGATIVE: -1.0,
+            MappingDirection.NEUTRAL: 0.0,
+        }
+        for event_id, event_views in by_event.items():
+            total_weight = sum(v.score for v in event_views) or 1.0
+            net = sum(sign_map[v.stance] * v.score for v in event_views) / total_weight
+            result[event_id] = {
+                "net": net,
+                "strength": min(total_weight, 2.0),
+            }
+        return result
+
+    def _average_theme_view_score(
+        self,
+        *,
+        events: list[MacroEvent],
+        view_scores: dict[str, dict[str, float]],
+    ) -> float:
+        if not events:
+            return 0.0
+        values: list[float] = []
+        for event in events:
+            score = view_scores.get(event.event_id)
+            if score:
+                values.append(abs(score["net"]))
+        if not values:
+            return 0.0
+        return sum(values) / len(values)
