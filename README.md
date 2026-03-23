@@ -2,6 +2,10 @@
 
 This repository contains a modular Python + LangGraph skeleton for an A-share research assistant.
 
+## Product docs
+- PRD (v1 baseline): [`docs/PRD_v1.md`](docs/PRD_v1.md)
+- Release + iteration checklist: [`docs/V1_release_iteration_checklist.md`](docs/V1_release_iteration_checklist.md)
+
 ## Storage decisions (locked)
 - Structured source-of-truth storage: Supabase PostgreSQL.
 - Access pattern: direct PostgreSQL connection from Python (`SQLAlchemy` + `psycopg`).
