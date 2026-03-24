@@ -9,7 +9,13 @@ from shared.config import settings
 
 
 def create_db_engine() -> Engine:
-    return create_engine(settings.supabase_db_url, pool_pre_ping=True)
+    # Supabase transaction pooler (pgBouncer) is incompatible with psycopg auto prepared statements.
+    # Disable server-side prepare to avoid DuplicatePreparedStatement errors.
+    return create_engine(
+        settings.supabase_db_url,
+        pool_pre_ping=True,
+        connect_args={"prepare_threshold": None},
+    )
 
 
 engine = create_db_engine()

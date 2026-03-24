@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from datetime import date, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict
 
 from contracts.enums import MacroBiasTag, MacroThemeType, SourceType
+
+if TYPE_CHECKING:
+    from macro.intel.pipeline import MacroIntelPipeline
 
 
 class MacroEvent(BaseModel):
@@ -26,12 +29,19 @@ class MacroEvent(BaseModel):
 
 
 class MacroRetriever:
-    def __init__(self, event_loader: Callable[[date], Sequence[dict[str, Any] | MacroEvent]] | None = None):
+    def __init__(
+        self,
+        event_loader: Callable[[date], Sequence[dict[str, Any] | MacroEvent]] | None = None,
+        intel_pipeline: "MacroIntelPipeline | None" = None,
+    ):
         self.event_loader = event_loader
+        self.intel_pipeline = intel_pipeline
 
     def fetch_daily_events(self, as_of_date: date) -> list[MacroEvent]:
         if self.event_loader is None:
-            return []
+            if self.intel_pipeline is None:
+                return []
+            return self.intel_pipeline.run(as_of_date)
 
         raw_events = self.event_loader(as_of_date)
         events: list[MacroEvent] = []

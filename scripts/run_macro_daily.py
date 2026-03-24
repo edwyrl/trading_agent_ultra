@@ -6,7 +6,11 @@ from datetime import date
 from pathlib import Path
 
 from app.container import Container
+from macro.intel.pipeline import MacroIntelPipeline
 from macro.retriever import MacroEvent
+from macro.retriever import MacroRetriever
+from macro.service import MacroService
+from macro.updater import MacroUpdater
 from shared.db.session import SessionLocal
 
 
@@ -18,6 +22,18 @@ def _parse_args() -> argparse.Namespace:
         dest="events_file",
         default=None,
         help="Optional JSON file containing a list of macro events.",
+    )
+    parser.add_argument(
+        "--use-intel",
+        dest="use_intel",
+        action="store_true",
+        help="Use macro intel pipeline (tavily+bocha) instead of manual events-file input.",
+    )
+    parser.add_argument(
+        "--intel-config",
+        dest="intel_config",
+        default=None,
+        help="Optional path to macro intel YAML config.",
     )
     return parser.parse_args()
 
@@ -39,7 +55,19 @@ def main() -> None:
     session = SessionLocal()
     try:
         container = Container(session=session)
-        master = container.macro_service().run_daily_incremental_update(as_of_date=as_of_date, events=events)
+        macro_service = container.macro_service()
+        if args.use_intel:
+            pipeline = MacroIntelPipeline.from_settings(config_path=args.intel_config)
+            repository = macro_service.repository
+            updater = MacroUpdater(
+                repository=repository,
+                retriever=MacroRetriever(intel_pipeline=pipeline),
+                mapper=macro_service.updater.mapper,
+                triggers=macro_service.updater.triggers,
+            )
+            macro_service = MacroService(repository=repository, updater=updater)
+            events = None
+        master = macro_service.run_daily_incremental_update(as_of_date=as_of_date, events=events)
         session.commit()
     except Exception:
         session.rollback()

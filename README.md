@@ -5,6 +5,7 @@ This repository contains a modular Python + LangGraph skeleton for an A-share re
 ## Product docs
 - PRD (v1 baseline): [`docs/PRD_v1.md`](docs/PRD_v1.md)
 - Release + iteration checklist: [`docs/V1_release_iteration_checklist.md`](docs/V1_release_iteration_checklist.md)
+- Macro intel module doc: [`docs/macro_intel_v1.md`](docs/macro_intel_v1.md)
 
 ## Storage decisions (locked)
 - Structured source-of-truth storage: Supabase PostgreSQL.
@@ -32,4 +33,11 @@ Recommended `SUPABASE_DB_URL` format for v1:
 ## Run migrations
 ```bash
 alembic upgrade head
+```
+
+## Macro cron (08:00 / 20:00 Asia/Shanghai)
+```bash
+chmod +x scripts/run_macro_intel_cron.sh scripts/setup_macro_cron.sh
+./scripts/setup_macro_cron.sh --install
+./scripts/setup_macro_cron.sh --show
 ```

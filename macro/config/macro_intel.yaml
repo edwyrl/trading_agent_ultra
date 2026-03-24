@@ -1,0 +1,127 @@
+layers:
+  regular:
+    - query_id: cn_monetary
+      topic: monetary
+      layer: regular
+      query: "中国 货币政策 央行 流动性 公开市场操作 最新"
+      theme_type: POLICY_ENVIRONMENT
+      language: zh
+      region: CN
+      source_profile: CN
+    - query_id: cn_growth_inflation
+      topic: growth_inflation
+      layer: regular
+      query: "中国 宏观 增长 通胀 就业 统计局 最新"
+      theme_type: DOMESTIC_AGGREGATE
+      language: zh
+      region: CN
+      source_profile: CN
+    - query_id: us_rates_fx
+      topic: us_rates_fx
+      layer: regular
+      query: "US macro inflation jobs Fed treasury yield dollar latest"
+      theme_type: OVERSEAS_MAPPING
+      language: en
+      region: US
+      source_profile: INTL
+  sentinel:
+    - query_id: geo_energy
+      topic: geopolitics_energy
+      layer: sentinel
+      query: "geopolitics energy shipping lane sanctions export control financial stability"
+      theme_type: OVERSEAS_MAPPING
+      language: en
+      region: GLOBAL
+      source_profile: INTL
+    - query_id: cn_external_shock
+      topic: external_shock
+      layer: sentinel
+      query: "中国 地缘政治 能源冲击 制裁 关税 出口管制 金融稳定 汇率"
+      theme_type: OVERSEAS_MAPPING
+      language: zh
+      region: CN
+      source_profile: CN
+
+routing:
+  default_engine:
+    zh_cn: bocha
+    en_or_global: tavily
+  dual_search_topics:
+    - geopolitics
+    - geopolitics_energy
+    - energy
+    - sanctions
+    - export_control
+    - financial_stability
+    - fx
+    - external_shock
+
+sources:
+  CN:
+    gov.cn: 0.98
+    pbc.gov.cn: 0.98
+    data.stats.gov.cn: 0.96
+    ndrc.gov.cn: 0.95
+    cs.com.cn: 0.70
+    stcn.com: 0.68
+  INTL:
+    federalreserve.gov: 0.98
+    treasury.gov: 0.98
+    bls.gov: 0.97
+    bea.gov: 0.97
+    imf.org: 0.96
+    worldbank.org: 0.95
+    reuters.com: 0.82
+    bloomberg.com: 0.82
+    ft.com: 0.80
+
+engines:
+  tavily:
+    search_depth: advanced
+    max_results: 10
+    include_answer: false
+    include_raw_content: true
+  bocha:
+    count: 10
+    freshness_days: 7
+
+scoring:
+  weights:
+    source_weight: 0.20
+    event_severity: 0.20
+    market_impact: 0.20
+    freshness: 0.15
+    cross_source_confirm: 0.15
+    transmission_chain: 0.10
+  thresholds:
+    high: 75.0
+    medium: 55.0
+
+upgrade_rules:
+  keywords:
+    - 能源
+    - 油价
+    - 航道
+    - 制裁
+    - 关税
+    - 出口管制
+    - 流动性
+    - 主权融资
+    - 汇率
+    - 地缘
+  market_move_keywords:
+    - oil
+    - treasury yield
+    - dollar
+    - gold
+    - volatility
+    - 美债
+    - 美元
+    - 黄金
+
+dedup:
+  title_similarity_threshold: 0.90
+
+cluster:
+  time_window_hours: 48
+  title_similarity_threshold: 0.86
