@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from agents.runtime import StubAgentRuntime
 from company.repository import PostgresCompanyRepository
 from company.services.company_context_assembler import CompanyContextAssembler
 from company.services.company_data_service import CompanyDataService
@@ -19,11 +20,16 @@ from integration.recheck_executor import IndustryRecheckExecutor
 from integration.repository import PostgresIntegrationRepository
 from macro.repository import PostgresMacroRepository
 from macro.service import MacroService
+from shared.config import settings
+from shared.llm.registry import LLMRegistry
+from shared.llm.router import LLMRouter
 
 
 class Container:
     def __init__(self, session: Session):
         self.session = session
+        self._llm_registry: LLMRegistry | None = None
+        self._llm_router: LLMRouter | None = None
 
     def macro_service(self) -> MacroService:
         return MacroService(repository=PostgresMacroRepository(self.session))
@@ -61,3 +67,16 @@ class Container:
             assembler=CompanyContextAssembler(),
             repository=company_repository,
         )
+
+    def llm_registry(self) -> LLMRegistry:
+        if self._llm_registry is None:
+            self._llm_registry = LLMRegistry.from_yaml(settings.llm_models_config_path)
+        return self._llm_registry
+
+    def llm_router(self) -> LLMRouter:
+        if self._llm_router is None:
+            self._llm_router = LLMRouter(registry=self.llm_registry())
+        return self._llm_router
+
+    def agent_runtime(self) -> StubAgentRuntime:
+        return StubAgentRuntime(router=self.llm_router())

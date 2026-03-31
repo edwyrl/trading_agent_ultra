@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Protocol
 
 from sqlalchemy import func, select
@@ -53,12 +53,15 @@ class MacroRepository(Protocol):
 
     def list_latest_event_history(self, as_of_date: date | None = None) -> list[MacroEventHistoryDTO]: ...
 
+    def list_event_history_since(self, since_at: datetime) -> list[MacroEventHistoryDTO]: ...
+
     def list_event_views(
         self,
         *,
         history_ids: list[str] | None = None,
         event_ids: list[str] | None = None,
         as_of_date: date | None = None,
+        created_since: datetime | None = None,
     ) -> list[MacroEventViewDTO]: ...
 
 
@@ -237,12 +240,37 @@ class PostgresMacroRepository:
             for row in rows
         ]
 
+    def list_event_history_since(self, since_at: datetime) -> list[MacroEventHistoryDTO]:
+        query = (
+            select(MacroEventHistoryModel)
+            .where(MacroEventHistoryModel.created_at >= since_at)
+            .order_by(MacroEventHistoryModel.created_at.desc())
+        )
+        rows = self.session.execute(query).scalars().all()
+        return [
+            MacroEventHistoryDTO(
+                history_id=row.history_id,
+                event_id=row.event_id,
+                event_seq=row.event_seq,
+                as_of_date=row.as_of_date,
+                event_status=row.event_status,
+                title=row.title,
+                fact_summary=row.fact_summary,
+                theme_type=row.theme_type,
+                bias_hint=row.bias_hint,
+                source_refs=row.source_refs or [],
+                created_at=row.created_at,
+            )
+            for row in rows
+        ]
+
     def list_event_views(
         self,
         *,
         history_ids: list[str] | None = None,
         event_ids: list[str] | None = None,
         as_of_date: date | None = None,
+        created_since: datetime | None = None,
     ) -> list[MacroEventViewDTO]:
         query = select(MacroEventViewModel)
         if history_ids:
@@ -251,6 +279,8 @@ class PostgresMacroRepository:
             query = query.where(MacroEventViewModel.event_id.in_(event_ids))
         if as_of_date:
             query = query.where(MacroEventViewModel.as_of_date <= as_of_date)
+        if created_since:
+            query = query.where(MacroEventViewModel.created_at >= created_since)
 
         rows = self.session.execute(query.order_by(MacroEventViewModel.created_at.desc())).scalars().all()
         return [

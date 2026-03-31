@@ -31,7 +31,7 @@ dev = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["app*", "contracts*", "shared*", "macro*", "industry*", "company*", "integration*", "graphs*"]
+include = ["app*", "contracts*", "shared*", "macro*", "industry*", "company*", "integration*", "graphs*", "agents*"]
 exclude = ["tests*", "scripts*", "alembic*", "trading_agent_env*"]
 
 [tool.pytest.ini_options]

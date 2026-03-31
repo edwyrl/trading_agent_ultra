@@ -1,0 +1,451 @@
+version: "1.0"
+name: "macro_daily_brief_queries"
+description: "Query config for CN-US macro daily briefing with sentinel coverage for geopolitics, energy, sanctions, and financial stability."
+
+schedule:
+  timezone: "Asia/Shanghai"
+  runs:
+    - "07:30"
+    - "18:30"
+
+defaults:
+  lookback_days: 3
+  max_results_per_query: 8
+  dedup_window_hours: 72
+  languages:
+    - "zh"
+    - "en"
+
+routing:
+  default:
+    zh: "bocha"
+    en: "tavily"
+  force_dual_for_categories:
+    - "geopolitics"
+    - "energy_shock"
+    - "sanctions_trade"
+    - "financial_stability"
+    - "market_anomaly"
+    - "fx"
+  dual_keywords:
+    - "伊朗"
+    - "以色列"
+    - "中东"
+    - "霍尔木兹"
+    - "红海"
+    - "苏伊士"
+    - "制裁"
+    - "出口管制"
+    - "关税"
+    - "原油"
+    - "天然气"
+    - "LNG"
+    - "银行压力"
+    - "流动性"
+    - "主权债"
+    - "Iran"
+    - "Israel"
+    - "Hormuz"
+    - "Red Sea"
+    - "Suez"
+    - "sanctions"
+    - "export controls"
+    - "tariffs"
+    - "oil"
+    - "gas"
+    - "LNG"
+    - "bank stress"
+    - "liquidity"
+    - "sovereign debt"
+
+sources:
+  cn:
+    official_domains:
+      - "pbc.gov.cn"
+      - "gov.cn"
+      - "mof.gov.cn"
+      - "stats.gov.cn"
+      - "customs.gov.cn"
+      - "cbirc.gov.cn"
+      - "nfra.gov.cn"
+      - "csrc.gov.cn"
+      - "safe.gov.cn"
+      - "ndrc.gov.cn"
+    media_domains:
+      - "caixin.com"
+      - "xinhuanet.com"
+      - "yicai.com"
+      - "stcn.com"
+      - "cs.com.cn"
+      - "21jingji.com"
+      - "cls.cn"
+  us_global:
+    official_domains:
+      - "federalreserve.gov"
+      - "treasury.gov"
+      - "bls.gov"
+      - "bea.gov"
+      - "census.gov"
+      - "whitehouse.gov"
+      - "ecb.europa.eu"
+      - "imf.org"
+      - "worldbank.org"
+      - "bis.org"
+    media_domains:
+      - "reuters.com"
+      - "bloomberg.com"
+      - "ft.com"
+      - "wsj.com"
+      - "cnbc.com"
+      - "marketwatch.com"
+      - "apnews.com"
+
+engines:
+  tavily:
+    search_defaults:
+      topic: "news"
+      time_range: "3d"
+      max_results: 5
+      include_raw_content: false
+      include_answer: false
+      include_domains: []
+      exclude_domains: []
+    finance_defaults:
+      topic: "finance"
+      time_range: "3d"
+      max_results: 5
+      include_raw_content: false
+      include_answer: false
+      include_domains: []
+      exclude_domains: []
+    extract_defaults:
+      extract_depth: "basic"
+  bocha:
+    search_defaults:
+      freshness: "oneWeek"
+      count: 8
+      summary: true
+    reranker_defaults:
+      top_n: 20
+
+scoring:
+  source_weight:
+    official: 25
+    tier1_media: 20
+    mainstream_media: 15
+    secondary_reprint: 8
+    unknown: 3
+  event_level:
+    policy_or_core_data: 25
+    official_statement: 20
+    operational_disruption: 18
+    market_reaction_only: 10
+    commentary_or_rumor: 4
+  market_impact:
+    max: 25
+  freshness:
+    within_24h: 15
+    within_48h: 10
+    within_72h: 6
+    older: 2
+  confirmation:
+    official_plus_tier1: 10
+    two_tier1: 7
+    single_tier1: 4
+    low_confidence: 1
+  transmission_chain:
+    full_chain: 20
+    medium_chain: 12
+    weak_chain: 5
+    none: 0
+  thresholds:
+    headline_candidate: 75
+    brief_candidate: 60
+
+quotas:
+  cn_top: 3
+  us_top: 3
+  cross_market_top: 2
+  max_same_topic_items: 2
+
+output:
+  format: "json"
+  required_fields:
+    - "title"
+    - "region"
+    - "category"
+    - "what_happened"
+    - "why_it_matters"
+    - "market_impact"
+    - "score"
+    - "sources"
+    - "published_at"
+
+query_groups:
+  regular_macro:
+    cn_monetary:
+      region: "CN"
+      category: "monetary_policy"
+      priority: "high"
+      route: "bocha"
+      queries:
+        zh:
+          - "中国人民银行 货币政策 OR 逆回购 OR MLF OR LPR OR 降准 OR 降息"
+          - "中国 央行 流动性 操作 OR 利率 走廊 OR 公开市场操作"
+    cn_fiscal:
+      region: "CN"
+      category: "fiscal_policy"
+      priority: "high"
+      route: "bocha"
+      queries:
+        zh:
+          - "财政部 地方债 OR 特别国债 OR 赤字 OR 财政政策 OR 专项债"
+          - "中国 财政 扩张 OR 地方融资 OR 政府债务 政策"
+    cn_growth_prices:
+      region: "CN"
+      category: "growth_inflation"
+      priority: "high"
+      route: "bocha"
+      queries:
+        zh:
+          - "国家统计局 CPI OR PPI OR PMI OR 工业增加值 OR 社零 OR 固定资产投资"
+          - "中国 通胀 OR 制造业 PMI OR 服务业 PMI OR 消费 数据"
+    cn_property:
+      region: "CN"
+      category: "property"
+      priority: "medium"
+      route: "bocha"
+      queries:
+        zh:
+          - "房地产 政策 OR 销售 OR 新房价格 OR 存量房 OR 融资支持"
+          - "中国 地产 去库存 OR 房地产 信用 OR 楼市 政策"
+    cn_trade_fx:
+      region: "CN"
+      category: "trade_fx"
+      priority: "medium"
+      route: "dual"
+      queries:
+        zh:
+          - "海关总署 出口 OR 进口 OR 贸易顺差 OR 人民币 汇率"
+          - "中国 外贸 OR 汇率 OR 资本流动 OR 外汇储备"
+        en:
+          - "China exports imports yuan exchange rate capital flows"
+    cn_fin_reg:
+      region: "CN"
+      category: "financial_regulation"
+      priority: "medium"
+      route: "bocha"
+      queries:
+        zh:
+          - "金融监管总局 证监会 银行 资本市场 政策 风险"
+          - "中国 银行 监管 OR 券商 监管 OR 金融 风险 处置"
+
+    us_fed:
+      region: "US"
+      category: "monetary_policy"
+      priority: "high"
+      route: "tavily"
+      tavily_profile: "news"
+      queries:
+        en:
+          - "Federal Reserve FOMC Powell rate outlook"
+          - "Fed policy path rate cuts inflation risks"
+    us_inflation:
+      region: "US"
+      category: "inflation"
+      priority: "high"
+      route: "tavily"
+      tavily_profile: "news"
+      queries:
+        en:
+          - "US CPI PCE inflation core inflation"
+          - "US inflation report prices shelter services"
+    us_labor:
+      region: "US"
+      category: "labor"
+      priority: "high"
+      route: "tavily"
+      tavily_profile: "news"
+      queries:
+        en:
+          - "US payrolls unemployment jobless claims labor market"
+          - "US jobs report wage growth labor market cooling"
+    us_treasury:
+      region: "US"
+      category: "fiscal_rates"
+      priority: "high"
+      route: "tavily"
+      tavily_profile: "finance"
+      queries:
+        en:
+          - "US Treasury auction deficit debt issuance Treasury yields"
+          - "US fiscal deficit bond supply yields market reaction"
+    us_growth:
+      region: "US"
+      category: "growth"
+      priority: "medium"
+      route: "tavily"
+      tavily_profile: "news"
+      queries:
+        en:
+          - "US retail sales ISM housing starts GDP nowcast"
+          - "US consumer spending manufacturing housing activity"
+    us_banks_credit:
+      region: "US"
+      category: "banking_credit"
+      priority: "medium"
+      route: "tavily"
+      tavily_profile: "news"
+      queries:
+        en:
+          - "US banks credit conditions lending stress regional banks"
+          - "US credit tightening bank lending standards market impact"
+
+    cross_fx:
+      region: "Cross"
+      category: "fx"
+      priority: "high"
+      route: "dual"
+      queries:
+        zh:
+          - "美元指数 OR 人民币 汇率 OR 美债收益率 市场波动"
+        en:
+          - "DXY US Treasury yields USD CNY market reaction"
+    cross_commodities:
+      region: "Cross"
+      category: "commodities"
+      priority: "medium"
+      route: "dual"
+      queries:
+        zh:
+          - "国际油价 铜价 黄金 风险偏好 全球市场"
+        en:
+          - "oil prices copper gold global risk sentiment"
+
+  sentinel:
+    geopolitics_conflict:
+      region: "Cross"
+      category: "geopolitics"
+      priority: "critical"
+      route: "dual"
+      queries:
+        zh:
+          - "伊朗 OR 以色列 OR 中东 冲突 油价 天然气 制裁 航运"
+          - "霍尔木兹海峡 OR 红海 OR 苏伊士 航运 风险 能源"
+          - "俄乌 冲突 能源 粮食 出口 市场"
+          - "台海 OR 南海 地缘政治 市场 风险"
+          - "朝鲜 半岛 地缘政治 市场 风险"
+        en:
+          - "Iran Israel conflict oil gas shipping sanctions"
+          - "Strait of Hormuz Red Sea Suez shipping energy markets"
+          - "Russia Ukraine energy grain exports markets"
+          - "Taiwan Strait geopolitical risk markets"
+          - "Korean Peninsula geopolitical risk markets"
+
+    energy_supply_shock:
+      region: "Cross"
+      category: "energy_shock"
+      priority: "critical"
+      route: "dual"
+      queries:
+        zh:
+          - "原油 供应中断 OR 油轮 OR 炼厂 OR OPEC 市场"
+          - "天然气 OR LNG 供应中断 欧洲 亚洲 价格"
+          - "电力 危机 OR 煤炭 供应 OR 极端天气 能源价格"
+          - "铜价 OR 金价 OR 粮食 价格 异动 全球市场"
+        en:
+          - "oil supply disruption tankers refinery OPEC markets"
+          - "natural gas LNG disruption Europe Asia prices"
+          - "power crisis coal supply extreme weather energy prices"
+          - "copper gold grain price shock global markets"
+
+    sanctions_trade_controls:
+      region: "Cross"
+      category: "sanctions_trade"
+      priority: "critical"
+      route: "dual"
+      queries:
+        zh:
+          - "美国 制裁 OR 次级制裁 全球市场 能源 金融"
+          - "出口管制 OR 半导体 OR 关键矿产 供应链 市场"
+          - "关税 OR 贸易限制 OR 反倾销 全球市场 宏观"
+          - "俄罗斯 OR 伊朗 OR 中国 制裁 金融 结算 航运"
+        en:
+          - "US sanctions secondary sanctions energy finance markets"
+          - "export controls semiconductors critical minerals supply chain markets"
+          - "tariffs trade restrictions antidumping macro markets"
+          - "Russia Iran China sanctions finance settlement shipping"
+
+    financial_stability:
+      region: "Cross"
+      category: "financial_stability"
+      priority: "critical"
+      route: "dual"
+      queries:
+        zh:
+          - "银行 流动性 压力 OR 存款 外流 OR 挤兑 OR 市场 风险"
+          - "主权债 风险 OR 国债 拍卖 失利 OR 融资压力"
+          - "货币市场 波动 OR 回购 利率 异常 OR 美元 流动性"
+          - "房地产 信用 风险 OR 信托 风险 OR 地方融资 风险"
+        en:
+          - "bank liquidity stress deposit outflows bank run market risk"
+          - "sovereign debt risk bond auction weak demand funding stress"
+          - "money market stress repo spike dollar liquidity"
+          - "property credit stress trust products local government financing risk"
+
+    market_anomaly:
+      region: "Cross"
+      category: "market_anomaly"
+      priority: "high"
+      route: "dual"
+      queries:
+        zh:
+          - "油价 大涨 OR 暴跌 原因 全球市场"
+          - "美债收益率 飙升 OR 暴跌 原因"
+          - "美元指数 大涨 OR 避险 升温"
+          - "黄金 大涨 全球风险"
+          - "亚洲股市 外资 流出 风险"
+        en:
+          - "oil surges market reaction cause"
+          - "Treasury yields jump market reaction cause"
+          - "dollar rises safe haven markets"
+          - "gold jumps geopolitical risk"
+          - "Asian stocks foreign outflows risk sentiment"
+
+triggers:
+  promote_to_macro_candidate_if_any_two:
+    - "涉及原油、天然气、电力、粮食或关键金属"
+    - "涉及关键航道或供应链中断"
+    - "涉及美国制裁、出口管制或重大关税"
+    - "涉及银行流动性、主权融资或信用利差异常"
+    - "已引发油价、美债、美元、黄金或全球股市明显波动"
+    - "可能改变Fed、PBOC或市场降息预期"
+
+post_processing:
+  dedup:
+    by:
+      - "institution"
+      - "event_type"
+      - "time_window"
+      - "headline_similarity"
+      - "key_figures"
+  clustering:
+    enabled: true
+    cluster_keys:
+      - "region"
+      - "category"
+      - "institution"
+      - "date"
+  extract_policy:
+    extract_top_n_per_group: 3
+    always_extract_for:
+      - "critical"
+    prefer_official_source: true
+
+llm_editor_policy:
+  rules:
+    - "只保留过去72小时内对中国、美国和全球风险资产最重要的宏观事件"
+    - "优先级：官方政策 > 核心数据 > 官方高层表态 > 利率汇率信用事件 > 一般评论"
+    - "忽略公司财报、泛行业新闻、纯评论、重复转载、无新增事实文章"
+    - "同一事件必须合并，不得重复占用多个头条位置"
+    - "每条输出必须说明：发生了什么、为什么重要、影响哪个资产变量"

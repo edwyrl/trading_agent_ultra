@@ -26,11 +26,23 @@ fi
 
 cd "$REPO_ROOT" || exit 1
 
+rc_cycle=0
+"$PY_BIN" scripts/run_macro_intel_cycle.py --date "$(date +%F)" >>"$LOG_FILE" 2>&1 || rc_cycle=$?
+
+rc_mail=0
+if [[ "$rc_cycle" -eq 0 ]]; then
+  "$PY_BIN" scripts/send_macro_digest_email.py --hours 24 >>"$LOG_FILE" 2>&1 || rc_mail=$?
+fi
+
 rc=0
-"$PY_BIN" scripts/run_macro_intel_cycle.py --date "$(date +%F)" >>"$LOG_FILE" 2>&1 || rc=$?
+if [[ "$rc_cycle" -ne 0 ]]; then
+  rc="$rc_cycle"
+elif [[ "$rc_mail" -ne 0 ]]; then
+  rc="$rc_mail"
+fi
 
 end_ts="$(date '+%Y-%m-%d %H:%M:%S %z')"
-echo "[$end_ts] macro_intel_cron end rc=$rc" >>"$LOG_FILE"
+echo "[$end_ts] macro_intel_cron end rc=$rc (cycle=$rc_cycle, mail=$rc_mail)" >>"$LOG_FILE"
 echo "" >>"$LOG_FILE"
 
 exit "$rc"

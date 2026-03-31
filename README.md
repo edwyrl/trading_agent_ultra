@@ -18,6 +18,10 @@ This repository contains a modular Python + LangGraph skeleton for an A-share re
 - `SUPABASE_DB_URL`
 - `SUPABASE_SCHEMA`
 - `APP_ENV`
+- `TAVILY_API_KEY`
+- `BOCHA_API_KEY`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
 
 Recommended `SUPABASE_DB_URL` format for v1:
 - Use Supabase Session Pooler (port `6543`) with `sslmode=require`.
@@ -40,4 +44,9 @@ alembic upgrade head
 chmod +x scripts/run_macro_intel_cron.sh scripts/setup_macro_cron.sh
 ./scripts/setup_macro_cron.sh --install
 ./scripts/setup_macro_cron.sh --show
+```
+
+## Macro digest email (24h events/views)
+```bash
+.venv/bin/python scripts/send_macro_digest_email.py --hours 24 --dry-run
 ```

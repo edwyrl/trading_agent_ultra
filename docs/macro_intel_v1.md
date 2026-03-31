@@ -161,7 +161,29 @@ CRON_TZ=Asia/Shanghai
 3. `macro_event_views` 当前默认写入 SOURCE 视角，AGENT/MANUAL 视角预留待扩展。
 4. 向量检索未启用，结构化 Postgres 仍是 SoT。
 
-## 13. 验收点
+## 13. 定时邮件（Resend）
+目标：
+- 每次 cron 触发后，发送近 24 小时的宏观事件 + 观点摘要到离线文档维护的邮箱列表。
+
+相关文件：
+- `scripts/send_macro_digest_email.py`
+- `macro/notifier.py`
+- `docs/macro_digest_recipients.md`
+
+环境变量：
+- `RESEND_API_KEY`
+- `RESEND_BASE_URL`（默认 `https://api.resend.com/emails`）
+- `RESEND_FROM_EMAIL`
+- `MACRO_DIGEST_RECIPIENTS_DOC_PATH`
+- `MACRO_DIGEST_SUBJECT_PREFIX`
+
+手动测试：
+```bash
+.venv/bin/python scripts/send_macro_digest_email.py --hours 24 --dry-run
+.venv/bin/python scripts/send_macro_digest_email.py --hours 24
+```
+
+## 14. 验收点
 1. `pytest -q` 全绿。
 2. `run_macro_intel_cycle.py` 可执行。
 3. 当有检索结果时，`macro_event_history` 与 `macro_event_views` 有新增。
