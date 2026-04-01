@@ -1,13 +1,3 @@
-version: "1.0"
-name: "macro_daily_brief_queries"
-description: "Query config for CN-US macro daily briefing with sentinel coverage for geopolitics, energy, sanctions, and financial stability."
-
-schedule:
-  timezone: "Asia/Shanghai"
-  runs:
-    - "07:30"
-    - "18:30"
-
 defaults:
   lookback_days: 3
   max_results_per_query: 8
