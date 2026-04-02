@@ -10,7 +10,7 @@ from shared.config import settings
 from shared.db.base import Base
 from shared.time_utils import utc_now
 
-_SCHEMA = settings.supabase_schema
+_SCHEMA = settings.database.schema_name
 
 
 class IndustryRecheckQueueModel(Base):

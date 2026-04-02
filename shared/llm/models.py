@@ -9,6 +9,7 @@ class LLMProvider(StrEnum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     MOONSHOT = "moonshot"
+    SILICONFLOW = "siliconflow"
 
 
 class ModelSpec(BaseModel):

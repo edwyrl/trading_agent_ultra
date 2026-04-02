@@ -12,7 +12,7 @@ def create_db_engine() -> Engine:
     # Supabase transaction pooler (pgBouncer) is incompatible with psycopg auto prepared statements.
     # Disable server-side prepare to avoid DuplicatePreparedStatement errors.
     return create_engine(
-        settings.supabase_db_url,
+        settings.database.db_url,
         pool_pre_ping=True,
         connect_args={"prepare_threshold": None},
     )

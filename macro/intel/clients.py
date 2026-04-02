@@ -21,11 +21,13 @@ class TavilySearchClient:
         base_url: str,
         timeout_seconds: float,
         default_params: dict[str, Any] | None = None,
+        profile_params: dict[str, dict[str, Any]] | None = None,
     ):
         self.api_key = (api_key or "").strip()
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.default_params = default_params or {}
+        self.profile_params = profile_params or {}
         self.logger = get_logger(__name__)
 
     def search(self, spec: SearchQuerySpec, *, include_domains: list[str] | None = None) -> list[RawArticle]:
@@ -33,10 +35,11 @@ class TavilySearchClient:
             self.logger.warning("tavily_api_key_missing query_id=%s", spec.query_id)
             return []
 
+        resolved_params = self._resolve_params(spec)
         payload: dict[str, Any] = {
             "api_key": self.api_key,
             "query": spec.query,
-            **self.default_params,
+            **resolved_params,
         }
         if include_domains:
             payload["include_domains"] = include_domains
@@ -78,6 +81,14 @@ class TavilySearchClient:
                 )
             )
         return articles
+
+    def _resolve_params(self, spec: SearchQuerySpec) -> dict[str, Any]:
+        profile = (spec.tavily_profile or "").strip().lower()
+        if profile:
+            chosen = self.profile_params.get(profile)
+            if isinstance(chosen, dict):
+                return dict(chosen)
+        return dict(self.default_params)
 
 
 class BochaSearchClient:

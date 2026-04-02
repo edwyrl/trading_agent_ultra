@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+import json
+from datetime import UTC, date, datetime, timedelta
 
 from contracts.enums import MacroThemeType
 from macro.intel.config import MacroIntelConfig
 from macro.intel.models import RawArticle, SearchEngine, SearchQuerySpec
 from macro.intel.pipeline import MacroIntelPipeline
 from macro.intel.router import MacroQueryRouter
+from macro.intel.summarizer import MacroSummaryResult
 
 
 class FakeClient:
@@ -31,6 +33,63 @@ class FakeClient:
                 )
             )
         return out
+
+
+class StubEditor:
+    def __init__(self, text: str):
+        self.text = text
+
+    def generate(self, *, scored, region: str, category: str) -> str:  # noqa: ANN001
+        _ = (scored, region, category)
+        return self.text
+
+
+class StubSummarizer:
+    def __init__(self, summary: str):
+        self.summary = summary
+
+    def summarize(self, *, scored, region: str, category: str) -> MacroSummaryResult:  # noqa: ANN001
+        _ = (scored, region, category)
+        return MacroSummaryResult(
+            summary=self.summary,
+            what_happened="事件已发生",
+            why_it_matters="将影响政策预期与利率定价。",
+            market_impact="利率/汇率",
+            key_numbers=["1.5%"],
+            policy_signal="中性维持",
+            confidence="medium",
+        )
+
+
+class SpecAwareClient:
+    def __init__(self, engine: SearchEngine):
+        self.engine = engine
+
+    def search(self, spec: SearchQuerySpec, *, include_domains: list[str] | None = None) -> list[RawArticle]:
+        _ = include_domains
+        order_map = {
+            "q_cn_1": 1,
+            "q_cn_2": 2,
+            "q_us_1": 3,
+            "q_us_2": 4,
+            "q_cross_fx_1": 5,
+            "q_cross_fx_2": 6,
+            "q_cross_com": 7,
+        }
+        order = order_map.get(spec.query_id, 99)
+        ts = datetime(2026, 3, 25, 12, 0, tzinfo=UTC)
+        published = ts.replace(minute=max(0, 60 - order))
+        return [
+            RawArticle.from_web_result(
+                engine=self.engine,
+                spec=spec,
+                title=f"{spec.region}-{spec.topic}-{spec.query_id} signal",
+                url=f"https://example.com/{spec.query_id}",
+                content=f"{spec.topic} signal transmission to liquidity and fx",
+                published_at=published,
+                language=spec.language,
+            )
+        ]
 
 
 def _config() -> MacroIntelConfig:
@@ -95,6 +154,123 @@ def _config() -> MacroIntelConfig:
     )
 
 
+def _config_with_quotas() -> MacroIntelConfig:
+    return MacroIntelConfig.model_validate(
+        {
+            "layers": {
+                "regular": [
+                    {
+                        "query_id": "q_cn_1",
+                        "topic": "monetary",
+                        "layer": "regular",
+                        "query": "cn1",
+                        "theme_type": "POLICY_ENVIRONMENT",
+                        "language": "zh",
+                        "region": "CN",
+                        "source_profile": "CN",
+                    },
+                    {
+                        "query_id": "q_cn_2",
+                        "topic": "growth",
+                        "layer": "regular",
+                        "query": "cn2",
+                        "theme_type": "DOMESTIC_AGGREGATE",
+                        "language": "zh",
+                        "region": "CN",
+                        "source_profile": "CN",
+                    },
+                    {
+                        "query_id": "q_us_1",
+                        "topic": "inflation",
+                        "layer": "regular",
+                        "query": "us1",
+                        "theme_type": "OVERSEAS_MAPPING",
+                        "language": "en",
+                        "region": "US",
+                        "source_profile": "INTL",
+                    },
+                    {
+                        "query_id": "q_us_2",
+                        "topic": "labor",
+                        "layer": "regular",
+                        "query": "us2",
+                        "theme_type": "OVERSEAS_MAPPING",
+                        "language": "en",
+                        "region": "US",
+                        "source_profile": "INTL",
+                    },
+                    {
+                        "query_id": "q_cross_fx_1",
+                        "topic": "fx",
+                        "layer": "regular",
+                        "query": "cross_fx_1",
+                        "theme_type": "OVERSEAS_MAPPING",
+                        "language": "en",
+                        "region": "Cross",
+                        "source_profile": "INTL",
+                    },
+                    {
+                        "query_id": "q_cross_fx_2",
+                        "topic": "fx",
+                        "layer": "regular",
+                        "query": "cross_fx_2",
+                        "theme_type": "OVERSEAS_MAPPING",
+                        "language": "en",
+                        "region": "Cross",
+                        "source_profile": "INTL",
+                    },
+                    {
+                        "query_id": "q_cross_com",
+                        "topic": "commodities",
+                        "layer": "regular",
+                        "query": "cross_com",
+                        "theme_type": "OVERSEAS_MAPPING",
+                        "language": "en",
+                        "region": "Cross",
+                        "source_profile": "INTL",
+                    },
+                ],
+                "sentinel": [],
+            },
+            "routing": {
+                "default_engine": {"zh_cn": "bocha", "en_or_global": "bocha"},
+                "dual_search_topics": [],
+            },
+            "sources": {
+                "CN": {"gov.cn": 0.98},
+                "INTL": {"reuters.com": 0.82},
+            },
+            "engines": {
+                "tavily": {"max_results": 5},
+                "bocha": {"count": 5},
+            },
+            "scoring": {
+                "weights": {
+                    "source_weight": 0.2,
+                    "event_severity": 0.2,
+                    "market_impact": 0.2,
+                    "freshness": 0.15,
+                    "cross_source_confirm": 0.15,
+                    "transmission_chain": 0.1,
+                },
+                "thresholds": {"high": 75, "medium": 55},
+            },
+            "upgrade_rules": {
+                "keywords": ["signal"],
+                "market_move_keywords": [],
+            },
+            "dedup": {"title_similarity_threshold": 0.9},
+            "cluster": {"time_window_hours": 48, "title_similarity_threshold": 0.86},
+            "quotas": {
+                "cn_top": 1,
+                "us_top": 1,
+                "cross_market_top": 2,
+                "max_same_topic_items": 1,
+            },
+        }
+    )
+
+
 def test_router_dual_search_rule() -> None:
     config = _config()
     router = MacroQueryRouter(config.routing)
@@ -104,6 +280,21 @@ def test_router_dual_search_rule() -> None:
 
     assert router.resolve_engines(regular) == [SearchEngine.BOCHA]
     assert router.resolve_engines(sentinel) == [SearchEngine.BOCHA, SearchEngine.TAVILY]
+
+
+def test_router_respects_explicit_query_route() -> None:
+    config = _config()
+    router = MacroQueryRouter(config.routing)
+    specs = config.build_query_specs()
+    regular = next(x for x in specs if x.topic == "monetary")
+
+    forced_tavily = regular.model_copy(update={"route": "tavily"})
+    forced_dual = regular.model_copy(update={"route": "dual"})
+    forced_bocha = regular.model_copy(update={"route": "bocha"})
+
+    assert router.resolve_engines(forced_tavily) == [SearchEngine.TAVILY]
+    assert router.resolve_engines(forced_dual) == [SearchEngine.BOCHA, SearchEngine.TAVILY]
+    assert router.resolve_engines(forced_bocha) == [SearchEngine.BOCHA]
 
 
 def test_pipeline_outputs_events_not_articles() -> None:
@@ -146,3 +337,137 @@ def test_pipeline_outputs_events_not_articles() -> None:
     assert all(e.source_type.value == "NEWS" for e in events)
     # Ensure sentinel topic with dual search can produce one macro candidate event
     assert any("oil" in e.summary.lower() or "油价" in e.summary for e in events)
+
+
+def test_pipeline_uses_structured_summarizer_for_event_summary() -> None:
+    config = _config()
+    bocha_rows = [
+        {
+            "title": "中国央行公开市场操作维持流动性",
+            "url": "https://www.pbc.gov.cn/a1",
+            "content": "流动性与汇率稳定",
+            "published_at": datetime.now(UTC),
+        }
+    ]
+    pipeline = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: FakeClient(SearchEngine.BOCHA, bocha_rows)},
+        summarizer=StubSummarizer("结构化摘要：政策操作延续，流动性保持平稳。"),
+    )
+
+    events = pipeline.run(as_of_date=date(2026, 3, 25))
+
+    assert events
+    assert events[0].summary == "结构化摘要：政策操作延续，流动性保持平稳。"
+
+
+def test_pipeline_writes_overwrite_log_with_required_fields(tmp_path) -> None:
+    config = _config()
+    bocha_rows = [
+        {
+            "title": "中国央行公开市场操作维持流动性",
+            "url": "https://www.pbc.gov.cn/a1",
+            "content": "流动性与汇率稳定",
+            "published_at": datetime.now(UTC),
+        }
+    ]
+    log_path = tmp_path / "macro_intel_latest.json"
+
+    pipeline = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: FakeClient(SearchEngine.BOCHA, bocha_rows)},
+        event_log_path=str(log_path),
+        editor=StubEditor("该事件可能影响政策预期与利率定价。"),
+    )
+
+    _ = pipeline.run(as_of_date=date(2026, 3, 25))
+    first = json.loads(log_path.read_text(encoding="utf-8"))
+    assert first["event_count"] >= 1
+    entry = first["events"][0]
+    assert {"region", "category", "why_it_matters", "score"} <= set(entry.keys())
+    assert {"summary", "key_numbers", "policy_signal", "confidence"} <= set(entry.keys())
+    assert entry["why_it_matters"] == "该事件可能影响政策预期与利率定价。"
+
+    pipeline_empty = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: FakeClient(SearchEngine.BOCHA, [])},
+        event_log_path=str(log_path),
+    )
+    _ = pipeline_empty.run(as_of_date=date(2026, 3, 26))
+    second = json.loads(log_path.read_text(encoding="utf-8"))
+    assert second["as_of_date"] == "2026-03-26"
+    assert second["event_count"] == 0
+    assert second["events"] == []
+
+
+def test_pipeline_applies_region_and_topic_quotas() -> None:
+    config = _config_with_quotas()
+    pipeline = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: SpecAwareClient(SearchEngine.BOCHA)},
+    )
+
+    events = pipeline.run(as_of_date=date(2026, 3, 25))
+    titles = [e.title for e in events]
+
+    assert len(events) == 4
+    assert sum(t.startswith("CN-") for t in titles) == 1
+    assert sum(t.startswith("US-") for t in titles) == 1
+    assert sum(t.startswith("Cross-") for t in titles) == 2
+    assert sum("-fx-" in t for t in titles) == 1
+
+
+def test_pipeline_enforces_required_fields_and_editor_policy(tmp_path) -> None:
+    config_payload = _config().model_dump()
+    config_payload["output"] = {
+        "format": "json",
+        "required_fields": [
+            "title",
+            "region",
+            "category",
+            "what_happened",
+            "why_it_matters",
+            "market_impact",
+            "score",
+            "sources",
+            "published_at",
+        ],
+    }
+    config_payload["llm_editor_policy"] = {
+        "rules": [
+            "只保留过去72小时内最重要的事件",
+            "忽略纯评论、传闻、无新增事实文章",
+        ]
+    }
+    config = MacroIntelConfig.model_validate(config_payload)
+
+    now = datetime.now(UTC)
+    old = now - timedelta(hours=100)
+    bocha_rows = [
+        {
+            "title": "中国央行公开市场操作维持流动性",
+            "url": "https://www.pbc.gov.cn/a1",
+            "content": "流动性与汇率稳定，油价波动关注",
+            "published_at": now,
+        },
+        {
+            "title": "市场传闻：油价评论文章",
+            "url": "https://www.stcn.com/a2",
+            "content": "rumor opinion without facts but oil mention",
+            "published_at": old,
+        },
+    ]
+    log_path = tmp_path / "macro_intel_latest.json"
+    pipeline = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: FakeClient(SearchEngine.BOCHA, bocha_rows)},
+        event_log_path=str(log_path),
+        editor=StubEditor("该事件对利率与风险偏好有边际影响。"),
+    )
+
+    _ = pipeline.run(as_of_date=date(2026, 3, 25))
+    payload = json.loads(log_path.read_text(encoding="utf-8"))
+    assert payload["event_count"] == 1
+    entry = payload["events"][0]
+    for key in config.output.required_fields:
+        assert key in entry

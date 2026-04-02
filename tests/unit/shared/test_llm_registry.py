@@ -37,3 +37,27 @@ def test_registry_rejects_unknown_model_for_role() -> None:
                 },
             }
         )
+
+
+def test_registry_supports_siliconflow_provider() -> None:
+    registry = LLMRegistry.from_dict(
+        {
+            "models": [
+                {
+                    "model_id": "siliconflow.qwen",
+                    "provider": "siliconflow",
+                    "api_model": "Qwen/Qwen2.5-32B-Instruct",
+                }
+            ],
+            "roles": {
+                "cn_research": {
+                    "model_id": "siliconflow.qwen",
+                    "temperature": 0.2,
+                }
+            },
+        }
+    )
+
+    role = registry.get_role("cn_research")
+    model = registry.get_model(role.model_id)
+    assert model.provider == LLMProvider.SILICONFLOW

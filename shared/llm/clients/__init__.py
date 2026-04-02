@@ -8,6 +8,7 @@ from shared.llm.clients.base import (
 )
 from shared.llm.clients.moonshot import MoonshotClient
 from shared.llm.clients.openai import OpenAIClient
+from shared.llm.clients.siliconflow import SiliconFlowClient
 
 __all__ = [
     "AnthropicClient",
@@ -18,4 +19,5 @@ __all__ = [
     "MoonshotClient",
     "OpenAIClient",
     "ProviderClient",
+    "SiliconFlowClient",
 ]

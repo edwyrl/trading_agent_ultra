@@ -9,6 +9,14 @@ class MacroQueryRouter:
         self.config = config
 
     def resolve_engines(self, spec: SearchQuerySpec) -> list[SearchEngine]:
+        explicit = (spec.route or "").strip().lower()
+        if explicit == "dual":
+            return [SearchEngine.BOCHA, SearchEngine.TAVILY]
+        if explicit == SearchEngine.BOCHA.value:
+            return [SearchEngine.BOCHA]
+        if explicit == SearchEngine.TAVILY.value:
+            return [SearchEngine.TAVILY]
+
         dual_topics = {t.lower() for t in self.config.dual_search_topics}
         if spec.topic.lower() in dual_topics:
             return [SearchEngine.BOCHA, SearchEngine.TAVILY]

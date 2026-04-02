@@ -19,7 +19,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
 
-    if not settings.resend_api_key.strip() or not settings.resend_from_email.strip():
+    if not settings.email.api_key.strip() or not settings.email.from_email.strip():
         print(
             json.dumps(
                 {
@@ -28,8 +28,8 @@ def main() -> None:
                     "missing": [
                         key
                         for key, value in {
-                            "RESEND_API_KEY": settings.resend_api_key,
-                            "RESEND_FROM_EMAIL": settings.resend_from_email,
+                            "RESEND_API_KEY": settings.email.api_key,
+                            "RESEND_FROM_EMAIL": settings.email.from_email,
                         }.items()
                         if not (value or "").strip()
                     ],
@@ -46,16 +46,16 @@ def main() -> None:
         repository = macro_service.repository
 
         client = ResendEmailClient(
-            api_key=settings.resend_api_key,
-            base_url=settings.resend_base_url,
-            timeout_seconds=settings.macro_intel_timeout_seconds,
+            api_key=settings.email.api_key,
+            base_url=settings.email.base_url,
+            timeout_seconds=settings.macro_intel.timeout_seconds,
         )
         notifier = MacroDigestNotifier(
             repository=repository,
             email_client=client,
-            from_email=settings.resend_from_email,
-            recipients_doc_path=settings.macro_digest_recipients_doc_path,
-            subject_prefix=settings.macro_digest_subject_prefix,
+            from_email=settings.email.from_email,
+            recipients_doc_path=settings.email.digest_recipients_doc_path,
+            subject_prefix=settings.email.digest_subject_prefix,
         )
         result = notifier.send_recent_digest(hours=args.hours, dry_run=args.dry_run)
 

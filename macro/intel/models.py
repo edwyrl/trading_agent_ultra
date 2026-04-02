@@ -30,6 +30,8 @@ class SearchQuerySpec(BaseModel):
     language: str
     region: str
     source_profile: str
+    route: str | None = None
+    tavily_profile: str | None = None
 
 
 class RawArticle(BaseModel):
@@ -46,6 +48,7 @@ class RawArticle(BaseModel):
     content: str = ""
     published_at: datetime | None = None
     language: str | None = None
+    region: str
     domain: str
     source_name: str | None = None
     raw_score: float | None = None
@@ -79,6 +82,7 @@ class RawArticle(BaseModel):
             content=content.strip(),
             published_at=published_at,
             language=language,
+            region=spec.region,
             domain=domain,
             source_name=source_name,
             raw_score=raw_score,

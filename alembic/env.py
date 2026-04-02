@@ -22,11 +22,11 @@ if config.config_file_name is not None:
 
 
 def _database_url() -> str:
-    return os.getenv("SUPABASE_DB_URL", settings.supabase_db_url)
+    return os.getenv("SUPABASE_DB_URL", settings.database.db_url)
 
 
 def _schema() -> str:
-    return os.getenv("SUPABASE_SCHEMA", settings.supabase_schema)
+    return os.getenv("SUPABASE_SCHEMA", settings.database.schema_name)
 
 
 def _configure_alembic_url() -> None:

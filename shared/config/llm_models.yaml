@@ -31,6 +31,14 @@ models:
     max_output_tokens: 8192
     description: Moonshot Chinese long context model
 
+  - model_id: siliconflow.qwen2_5_32b
+    provider: siliconflow
+    api_model: Qwen/Qwen2.5-32B-Instruct
+    capabilities: [chinese, reasoning, cost_effective]
+    max_input_tokens: 128000
+    max_output_tokens: 8192
+    description: SiliconFlow hosted domestic model (OpenAI-compatible endpoint)
+
 roles:
   research:
     model_id: openai.gpt-4.1
@@ -47,4 +55,20 @@ roles:
   fast_draft:
     model_id: moonshot.kimi-k2
     temperature: 0.3
+    max_output_tokens: 2048
+  macro_editor:
+    model_id: openai.gpt-4.1-mini
+    temperature: 0.1
+    max_output_tokens: 256
+    system_prompt: >
+      你是宏观研究编辑。输出简洁、可执行，聚焦事件对资产变量与政策预期的影响。
+  macro_summarizer:
+    model_id: openai.gpt-4.1-mini
+    temperature: 0.1
+    max_output_tokens: 512
+    system_prompt: >
+      你是宏观新闻整合分析师。必须基于输入证据做结构化归纳，禁止编造来源和事实。
+  cn_research:
+    model_id: siliconflow.qwen2_5_32b
+    temperature: 0.2
     max_output_tokens: 2048

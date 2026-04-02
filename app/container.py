@@ -70,7 +70,7 @@ class Container:
 
     def llm_registry(self) -> LLMRegistry:
         if self._llm_registry is None:
-            self._llm_registry = LLMRegistry.from_yaml(settings.llm_models_config_path)
+            self._llm_registry = LLMRegistry.from_yaml(settings.llm.models_config_path)
         return self._llm_registry
 
     def llm_router(self) -> LLMRouter:
