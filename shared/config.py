@@ -50,6 +50,7 @@ class MacroIntelSettings(BaseModel):
     timeout_seconds: float
     config_path: str
     event_log_path: str
+    eval_pack_path: str
     editor_role: str
     editor_timeout_seconds: float
     summarizer_role: str
@@ -64,6 +65,14 @@ class EmailSettings(BaseModel):
     from_email: str
     digest_recipients_doc_path: str
     digest_subject_prefix: str
+    eval_google_form_url: str
+    eval_form_entry_date: str
+    eval_form_entry_sample_id: str
+    eval_form_entry_selected: str
+    eval_form_entry_topic: str
+    eval_form_entry_event_id: str
+    eval_form_selected_true_value: str
+    eval_form_selected_false_value: str
 
 
 class Settings(BaseSettings):
@@ -79,6 +88,7 @@ class Settings(BaseSettings):
     macro_intel_timeout_seconds: float = 15.0
     macro_intel_config_path: str = "macro/config/macro_intel.yaml"
     macro_intel_event_log_path: str = "logs/macro_intel_latest.json"
+    macro_intel_eval_pack_path: str = "logs/macro_eval_pack_latest.json"
     macro_intel_editor_role: str = "macro_editor"
     macro_intel_editor_timeout_seconds: float = 12.0
     macro_intel_summarizer_role: str = "macro_summarizer"
@@ -97,6 +107,21 @@ class Settings(BaseSettings):
     resend_from_email: str = ""
     macro_digest_recipients_doc_path: str = "docs/macro_digest_recipients.md"
     macro_digest_subject_prefix: str = "[Macro Digest]"
+    macro_eval_google_form_url: str = ""
+    macro_eval_form_entry_date: str = ""
+    macro_eval_form_entry_sample_id: str = ""
+    macro_eval_form_entry_selected: str = ""
+    macro_eval_form_entry_topic: str = ""
+    macro_eval_form_entry_event_id: str = ""
+    macro_eval_form_selected_true_value: str = "True"
+    macro_eval_form_selected_false_value: str = "False"
+    tushare_api_key: str = ""
+    tushare_base_url: str = "http://api.tushare.pro"
+    tushare_timeout_seconds: float = 30.0
+    tushare_page_size: int = 5000
+    tushare_retry_max_attempts: int = 3
+    tushare_retry_delay_seconds: float = 30.0
+    tushare_max_pages: int = 200
 
     @cached_property
     def database(self) -> DatabaseSettings:
@@ -146,6 +171,7 @@ class Settings(BaseSettings):
             timeout_seconds=self.macro_intel_timeout_seconds,
             config_path=self.macro_intel_config_path,
             event_log_path=self.macro_intel_event_log_path,
+            eval_pack_path=self.macro_intel_eval_pack_path,
             editor_role=self.macro_intel_editor_role,
             editor_timeout_seconds=self.macro_intel_editor_timeout_seconds,
             summarizer_role=self.macro_intel_summarizer_role,
@@ -160,6 +186,14 @@ class Settings(BaseSettings):
             from_email=self.resend_from_email,
             digest_recipients_doc_path=self.macro_digest_recipients_doc_path,
             digest_subject_prefix=self.macro_digest_subject_prefix,
+            eval_google_form_url=self.macro_eval_google_form_url,
+            eval_form_entry_date=self.macro_eval_form_entry_date,
+            eval_form_entry_sample_id=self.macro_eval_form_entry_sample_id,
+            eval_form_entry_selected=self.macro_eval_form_entry_selected,
+            eval_form_entry_topic=self.macro_eval_form_entry_topic,
+            eval_form_entry_event_id=self.macro_eval_form_entry_event_id,
+            eval_form_selected_true_value=self.macro_eval_form_selected_true_value,
+            eval_form_selected_false_value=self.macro_eval_form_selected_false_value,
         )
 
 

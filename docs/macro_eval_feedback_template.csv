@@ -1,0 +1,3 @@
+date,sample_id,selected,topic,event_id,should_report,importance,is_duplicate,duplicate_of,missed_note,comment
+2026-04-09,sel-01,True,monetary_policy,intel:monetary_policy:xxxx,Y,H,N,,,
+2026-04-09,rej-01,False,trade_fx,intel:trade_fx:xxxx,N,L,Y,sel-02,遗漏了某海外央行临时操作 https://example.com/xx（影响汇率预期）,

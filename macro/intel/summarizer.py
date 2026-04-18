@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from macro.intel.editor import _normalize_text, complete_with_role
+from macro.intel.editor import _normalize_text, _resolve_first_usable_role, complete_with_role
 from macro.intel.models import RawArticle, ScoredEvent
 from shared.config import settings
 from shared.llm.registry import LLMRegistry
@@ -43,7 +43,15 @@ class MacroNewsSummarizer:
     def from_settings(cls) -> "MacroNewsSummarizer | None":
         try:
             router = LLMRouter(registry=LLMRegistry.from_yaml(settings.llm.models_config_path))
-            router.resolve(role=settings.macro_intel.summarizer_role)
+            selected_role = _resolve_first_usable_role(
+                router=router,
+                role_candidates=[
+                    settings.macro_intel.summarizer_role,
+                    "summarize",
+                    "cn_research",
+                    "fast_draft",
+                ],
+            )
         except Exception as exc:
             get_logger(__name__).warning(
                 "macro_summarizer_role_invalid role=%s err=%s",
@@ -51,8 +59,20 @@ class MacroNewsSummarizer:
                 exc,
             )
             return None
+        if selected_role is None:
+            get_logger(__name__).warning(
+                "macro_summarizer_no_usable_role configured_role=%s",
+                settings.macro_intel.summarizer_role,
+            )
+            return None
+        if selected_role != settings.macro_intel.summarizer_role:
+            get_logger(__name__).warning(
+                "macro_summarizer_role_fallback from=%s to=%s",
+                settings.macro_intel.summarizer_role,
+                selected_role,
+            )
         return cls(
-            role=settings.macro_intel.summarizer_role,
+            role=selected_role,
             router=router,
             timeout_seconds=settings.macro_intel.summarizer_timeout_seconds,
         )

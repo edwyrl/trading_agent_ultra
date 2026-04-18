@@ -33,20 +33,26 @@
 - 文件：`macro/intel/router.py`
 - 配置：`macro/config/macro_intel.yaml -> routing`
 
-## 4. 白名单与来源权重
+## 4. 来源策略（来源权重 + 黑名单剔除）
 按 `CN / INTL` 两套来源权重管理：
 - CN 例：`gov.cn`, `pbc.gov.cn`, `data.stats.gov.cn`
 - INTL 例：`federalreserve.gov`, `treasury.gov`, `reuters.com`
 
 作用：
-1. 提升信噪比（域名过滤）
-2. 给事件评分中的 `source_weight` 提供依据
+1. `sources` 白名单：直接提供 `source_weight` 基准分（非硬过滤，不叠加额外 bonus）。
+2. 黑名单：在检索结果阶段直接剔除（硬过滤）。
+3. 最终是否入选仍由综合分数与规则共同决定（不是仅看来源）。
 
-配置：`macro/config/macro_intel.yaml -> sources`
+配置：
+- `macro/config/macro_intel.yaml -> sources`
+- `macro/config/macro_intel.yaml -> source_policy`
 
 ## 5. 引擎参数
 - Tavily 参数：`search_depth`, `max_results`, `include_raw_content`
 - Bocha 参数：`count`, `freshness_days`
+- 消耗统计与告警阈值：`usage_alert`
+  - `bocha_call_warn` / `tavily_call_warn`
+  - `bocha_attempt_warn` / `tavily_attempt_warn`
 
 配置：`macro/config/macro_intel.yaml -> engines`
 
@@ -57,6 +63,14 @@
 - `BOCHA_BASE_URL`
 - `MACRO_INTEL_TIMEOUT_SECONDS`
 - `MACRO_INTEL_CONFIG_PATH`
+- `MACRO_EVAL_GOOGLE_FORM_URL`（可选，评估邮件顶部展示固定填报链接）
+- `MACRO_EVAL_FORM_ENTRY_DATE`
+- `MACRO_EVAL_FORM_ENTRY_SAMPLE_ID`
+- `MACRO_EVAL_FORM_ENTRY_SELECTED`
+- `MACRO_EVAL_FORM_ENTRY_TOPIC`
+- `MACRO_EVAL_FORM_ENTRY_EVENT_ID`
+- `MACRO_EVAL_FORM_SELECTED_TRUE_VALUE`（默认 `True`）
+- `MACRO_EVAL_FORM_SELECTED_FALSE_VALUE`（默认 `False`）
 
 ## 6. 处理链路
 
@@ -182,6 +196,22 @@ CRON_TZ=Asia/Shanghai
 .venv/bin/python scripts/send_macro_digest_email.py --hours 24 --dry-run
 .venv/bin/python scripts/send_macro_digest_email.py --hours 24
 ```
+
+人工评审样本邮件（每日 1 次）：
+```bash
+.venv/bin/python scripts/send_macro_digest_email.py --eval-mode --dry-run
+.venv/bin/python scripts/send_macro_digest_email.py --eval-mode
+```
+
+每周反馈汇总（CSV -> Markdown/JSON）：
+```bash
+.venv/bin/python scripts/build_macro_eval_weekly_report.py \
+  --input-csv docs/macro_eval_feedback_template.csv \
+  --week-label 2026-W15
+```
+
+首周执行清单（每日/每周）：
+- `docs/macro_eval_week1_runbook.md`
 
 ## 14. 验收点
 1. `pytest -q` 全绿。

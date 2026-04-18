@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from enum import StrEnum
 from urllib.parse import urlparse
@@ -69,7 +70,9 @@ class RawArticle(BaseModel):
     ) -> "RawArticle":
         parsed = urlparse(url)
         domain = parsed.netloc.lower().replace("www.", "")
-        article_id = f"{engine.value}:{spec.query_id}:{abs(hash((title, url)))}"
+        fingerprint = f"{engine.value}|{spec.query_id}|{normalize_title(title)}|{url.strip()}"
+        digest = hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()[:24]
+        article_id = f"art:{engine.value}:{digest}"
         return cls(
             article_id=article_id,
             engine=engine,

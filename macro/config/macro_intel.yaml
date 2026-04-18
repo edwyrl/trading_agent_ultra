@@ -60,10 +60,13 @@ sources:
   CN:
     gov.cn: 0.98
     pbc.gov.cn: 0.98
-    data.stats.gov.cn: 0.96
-    ndrc.gov.cn: 0.95
-    cs.com.cn: 0.70
-    stcn.com: 0.68
+    data.stats.gov.cn: 0.97
+    ndrc.gov.cn: 0.96
+    xinhuanet.com: 0.78
+    caixin.com: 0.76
+    yicai.com: 0.72
+    cs.com.cn: 0.64
+    stcn.com: 0.62
   INTL:
     federalreserve.gov: 0.98
     treasury.gov: 0.98
@@ -71,9 +74,25 @@ sources:
     bea.gov: 0.97
     imf.org: 0.96
     worldbank.org: 0.95
-    reuters.com: 0.82
-    bloomberg.com: 0.82
+    bloomberg.com: 0.85
+    reuters.com: 0.84
+    wsj.com: 0.83
     ft.com: 0.80
+    cnbc.com: 0.76
+    apnews.com: 0.74
+    marketwatch.com: 0.70
+
+source_policy:
+  deny_domains:
+    - baijiahao.baidu.com
+    - mbd.baidu.com
+    - toutiao.com
+
+usage_alert:
+  bocha_call_warn: 8
+  tavily_call_warn: 8
+  bocha_attempt_warn: 10
+  tavily_attempt_warn: 10
 
 engines:
   tavily:

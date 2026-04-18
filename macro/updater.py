@@ -85,6 +85,7 @@ class MacroUpdater:
         previous = self.repository.get_latest_master(as_of_date=as_of_date)
         incoming_events = events if events is not None else self.retriever.fetch_daily_events(as_of_date)
         ingested = self._persist_event_history_and_views(as_of_date=as_of_date, events=incoming_events)
+        self._flush_repository_writes()
 
         active_histories = self.repository.list_latest_event_history(as_of_date=as_of_date)
         active_events = self._events_from_histories(active_histories)
@@ -172,6 +173,14 @@ class MacroUpdater:
         )
 
         return master
+
+    def _flush_repository_writes(self) -> None:
+        session = getattr(self.repository, "session", None)
+        if session is None:
+            return
+        flush = getattr(session, "flush", None)
+        if callable(flush):
+            flush()
 
     def _group_events_by_theme(self, events: Iterable[MacroEvent]) -> dict[MacroThemeType, list[MacroEvent]]:
         grouped: dict[MacroThemeType, list[MacroEvent]] = defaultdict(list)

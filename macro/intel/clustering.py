@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
 
@@ -23,7 +24,7 @@ class EventClusterer:
             if matched is None:
                 clusters.append(
                     EventCluster(
-                        cluster_id=f"clu:{row.topic}:{abs(hash((row.topic, normalize_title(row.title))))}",
+                        cluster_id=self._stable_cluster_id(row),
                         topic=row.topic,
                         layer=row.layer,
                         theme_type=row.theme_type,
@@ -35,6 +36,13 @@ class EventClusterer:
             matched.articles.append(row)
 
         return clusters
+
+    @staticmethod
+    def _stable_cluster_id(row: RawArticle) -> str:
+        topic = "_".join(row.topic.strip().lower().split())[:24] or "topic"
+        fingerprint = f"{row.topic}|{normalize_title(row.title)}"
+        digest = hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()[:20]
+        return f"clu:{topic}:{digest}"
 
     def _find_match(self, clusters: list[EventCluster], row: RawArticle) -> EventCluster | None:
         for clu in clusters:

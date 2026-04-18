@@ -41,16 +41,42 @@ class EventScorer:
         )
 
     def _source_weight(self, cluster: EventCluster) -> float:
-        profile = cluster.articles[0].layer
-        profile_key = "CN" if profile == MacroLayer.REGULAR and any(a.domain.endswith(".cn") for a in cluster.articles) else None
-        if profile_key is None:
-            profile_key = "CN" if any(a.domain.endswith(".cn") for a in cluster.articles) else "INTL"
-
+        profile_key = self._source_profile_key(cluster)
         source_map = self.config.sources.get(profile_key, {})
         if not source_map:
             return 0.5
-        vals = [source_map.get(a.domain, 0.5) for a in cluster.articles]
-        return max(0.0, min(sum(vals) / len(vals), 1.0)) if vals else 0.5
+
+        vals: list[float] = []
+        for article in cluster.articles:
+            matched_weight = self._lookup_source_weight(domain=article.domain, source_map=source_map)
+            if matched_weight is None:
+                vals.append(0.5)
+                continue
+            vals.append(matched_weight)
+
+        if not vals:
+            return 0.5
+
+        return max(0.0, min(sum(vals) / len(vals), 1.0))
+
+    @staticmethod
+    def _source_profile_key(cluster: EventCluster) -> str:
+        region = (cluster.articles[0].region or "").strip().upper()
+        if region == "CN":
+            return "CN"
+        return "INTL"
+
+    def _lookup_source_weight(self, *, domain: str, source_map: dict[str, float]) -> float | None:
+        token = self._normalize_domain(domain)
+        for known, weight in source_map.items():
+            ref = self._normalize_domain(known)
+            if token == ref or token.endswith(f".{ref}"):
+                return float(weight)
+        return None
+
+    @staticmethod
+    def _normalize_domain(domain: str) -> str:
+        return (domain or "").strip().lower().replace("https://", "").replace("http://", "").replace("www.", "")
 
     def _event_severity(self, cluster: EventCluster) -> float:
         text = cluster.combined_text.lower()

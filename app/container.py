@@ -59,7 +59,7 @@ class Container:
         macro_service = self.macro_service()
         industry_service = self.industry_service()
         return CompanyContextOrchestrator(
-            company_data_service=CompanyDataService(),
+            company_data_service=CompanyDataService(session=self.session),
             metrics_tools=MetricsTools(),
             concept_tag_extractor=ConceptTagExtractor(),
             macro_constraints_tool=MacroConstraintsTool(provider=macro_service),

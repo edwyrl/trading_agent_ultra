@@ -14,6 +14,9 @@ def test_load_legacy_macro_intel_config_still_works() -> None:
     assert config.routing.default_engine["en_or_global"] == "tavily"
     assert config.scoring.thresholds.high == 75.0
     assert config.scoring.thresholds.medium == 55.0
+    assert {"baijiahao.baidu.com", "mbd.baidu.com", "toutiao.com"} <= set(config.source_policy.deny_domains)
+    assert config.usage_alert.bocha_call_warn > 0
+    assert config.usage_alert.tavily_call_warn > 0
 
 
 def test_load_v1_1_macro_intel_config_is_mapped_to_runtime_schema() -> None:
@@ -41,6 +44,9 @@ def test_load_v1_1_macro_intel_config_is_mapped_to_runtime_schema() -> None:
     assert "event_type" in config.dedup.by
     assert "time_window" in config.dedup.by
     assert config.dedup.time_window_hours == 72
+    assert {"baijiahao.baidu.com", "mbd.baidu.com", "toutiao.com"} <= set(config.source_policy.deny_domains)
+    assert config.usage_alert.bocha_attempt_warn > 0
+    assert config.usage_alert.tavily_attempt_warn > 0
     assert "why_it_matters" in config.output.required_fields
     assert "score" in config.output.required_fields
     assert config.llm_editor_policy.rules

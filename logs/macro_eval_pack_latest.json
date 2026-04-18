@@ -1,0 +1,274 @@
+{
+  "as_of_date": "2026-04-11",
+  "generated_at": "2026-04-10T17:14:12.941251+00:00",
+  "targets": {
+    "selected": 6,
+    "non_selected": 6,
+    "total": 12
+  },
+  "selected_count": 6,
+  "non_selected_count": 6,
+  "sample_count": 12,
+  "shortage": {
+    "selected": 0,
+    "non_selected": 0
+  },
+  "selected_samples": [
+    {
+      "sample_id": "sel-01",
+      "event_id": "intel:market_anomaly:044f68c77497bb5873d3e232",
+      "topic": "market_anomaly",
+      "title": "Precious Metals Rise, Boosted by Dollar Weakness, Lower Treasury Yields - WSJ",
+      "url": "https://www.wsj.com/opinion/precious-metals-rise-boosted-by-dollar-weakness-lower-treasury-yields-0efeec33",
+      "score": 58.95,
+      "source_domain": "wsj.com",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-02",
+      "event_id": "intel:market_anomaly:820f2eff5afb776d7e9a0b1e",
+      "topic": "market_anomaly",
+      "title": "Gold rises to near three-week high as Trump pauses attacks on Iran - CNBC",
+      "url": "https://www.cnbc.com/2026/04/08/gold-rises-to-near-three-week-high-as-trump-pauses-attacks-on-iran.html",
+      "score": 58.15,
+      "source_domain": "cnbc.com",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-03",
+      "event_id": "intel:banking_credit:868fcd71504a6f9c86ad331d",
+      "topic": "banking_credit",
+      "title": "Effects of Stablecoin Yield Prohibition on Bank Lending - The White House (.gov)",
+      "url": "https://www.whitehouse.gov/research/2026/04/effects-of-stablecoin-yield-prohibition-on-bank-lending/",
+      "score": 55.55,
+      "source_domain": "whitehouse.gov",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-04",
+      "event_id": "intel:trade_fx:1b23dbaec1dce87e0031bdc1",
+      "topic": "trade_fx",
+      "title": "汇率避险知识速递(一)汇率风险来源_分局动态_上海市分局",
+      "url": "https://www.safe.gov.cn/shanghai/2026/0409/2417.html",
+      "score": 54.15,
+      "source_domain": "safe.gov.cn",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-05",
+      "event_id": "intel:growth:7fe9fb34a75b452e1548fa87",
+      "topic": "growth",
+      "title": "Personal Income and Outlays, February 2026 - U.S. Bureau of Economic Analysis (BEA) (.gov)",
+      "url": "https://www.bea.gov/news/2026/personal-income-and-outlays-february-2026",
+      "score": 54.15,
+      "source_domain": "bea.gov",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-06",
+      "event_id": "intel:inflation:fc6dc3c6739cfb5244f16966",
+      "topic": "inflation",
+      "title": "US PCE inflation picks up in February; consumer spending solid - Reuters",
+      "url": "https://www.reuters.com/business/us-pce-inflation-picks-up-february-consumer-spending-solid-2026-04-09/",
+      "score": 53.35,
+      "source_domain": "reuters.com",
+      "selected": true
+    }
+  ],
+  "non_selected_samples": [
+    {
+      "sample_id": "rej-01",
+      "event_id": "intel:market_anomaly:5e91ed7f7820ef406a246eca",
+      "topic": "market_anomaly",
+      "title": "U.S.-Iran ceasefire relief rally lifts global assets as oil plunges below $100 - CNBC",
+      "url": "https://www.cnbc.com/2026/04/08/us-iran-ceasefire-gold-oil-stocks-treasuries.html",
+      "score": 57.35,
+      "source_domain": "cnbc.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-02",
+      "event_id": "intel:geopolitics:c4910b6b564a3bd41e9b83ae",
+      "topic": "geopolitics",
+      "title": "Asian stocks mostly higher and oil gains ahead of planned U.S.-Iran peace talks - AP News",
+      "url": "https://apnews.com/article/stock-markets-trump-iran-ceasefire-oil-7ef6ebab1aaa731d2da6406b3cbde6dd",
+      "score": 56.15,
+      "source_domain": "apnews.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-03",
+      "event_id": "intel:fx:25cd54ce4edc51785ea40c8f",
+      "topic": "fx",
+      "title": "U.S. Treasury Yields, Dollar Fall in European Trade - WSJ",
+      "url": "https://www.wsj.com/finance/jgbs-rise-as-inflation-concerns-ease-after-trumps-cease-fire-agreement-72092ed7",
+      "score": 55.15,
+      "source_domain": "wsj.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-04",
+      "event_id": "intel:financial_stability:7a9111bf7a4e23bda263d3ea",
+      "topic": "financial_stability",
+      "title": "BSP in wait-and-see mode amid energy shock, says Governor Eli Remolona - CNBC",
+      "url": "https://www.cnbc.com/video/2026/04/10/bsp-in-wait-and-see-mode-amid-energy-shock-says-governor-eli-remolona.html",
+      "score": 54.35,
+      "source_domain": "cnbc.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-05",
+      "event_id": "intel:energy_shock:ed18bbbc8024bae0c6b667df",
+      "topic": "energy_shock",
+      "title": "Attacks cut Saudi oil output and East-West pipeline flow, state news agency says - Reuters",
+      "url": "https://www.reuters.com/business/energy/operational-activities-halted-several-energy-facilities-saudi-arabia-state-news-2026-04-09/",
+      "score": 53.75,
+      "source_domain": "reuters.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-06",
+      "event_id": "intel:growth_inflation:1ba36a3f2b7f29be1bc53daa",
+      "topic": "growth_inflation",
+      "title": "三大指数重返扩张区间 经济景气水平回升--透视3月PMI数据",
+      "url": "http://sjt.guizhou.gov.cn/zwgk/zdlyxx/tjsj/202604/t20260410_89979353.html",
+      "score": 51.75,
+      "source_domain": "sjt.guizhou.gov.cn",
+      "selected": false,
+      "reject_reason": "below_threshold"
+    }
+  ],
+  "samples": [
+    {
+      "sample_id": "sel-01",
+      "event_id": "intel:market_anomaly:044f68c77497bb5873d3e232",
+      "topic": "market_anomaly",
+      "title": "Precious Metals Rise, Boosted by Dollar Weakness, Lower Treasury Yields - WSJ",
+      "url": "https://www.wsj.com/opinion/precious-metals-rise-boosted-by-dollar-weakness-lower-treasury-yields-0efeec33",
+      "score": 58.95,
+      "source_domain": "wsj.com",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-02",
+      "event_id": "intel:market_anomaly:820f2eff5afb776d7e9a0b1e",
+      "topic": "market_anomaly",
+      "title": "Gold rises to near three-week high as Trump pauses attacks on Iran - CNBC",
+      "url": "https://www.cnbc.com/2026/04/08/gold-rises-to-near-three-week-high-as-trump-pauses-attacks-on-iran.html",
+      "score": 58.15,
+      "source_domain": "cnbc.com",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-03",
+      "event_id": "intel:banking_credit:868fcd71504a6f9c86ad331d",
+      "topic": "banking_credit",
+      "title": "Effects of Stablecoin Yield Prohibition on Bank Lending - The White House (.gov)",
+      "url": "https://www.whitehouse.gov/research/2026/04/effects-of-stablecoin-yield-prohibition-on-bank-lending/",
+      "score": 55.55,
+      "source_domain": "whitehouse.gov",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-04",
+      "event_id": "intel:trade_fx:1b23dbaec1dce87e0031bdc1",
+      "topic": "trade_fx",
+      "title": "汇率避险知识速递(一)汇率风险来源_分局动态_上海市分局",
+      "url": "https://www.safe.gov.cn/shanghai/2026/0409/2417.html",
+      "score": 54.15,
+      "source_domain": "safe.gov.cn",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-05",
+      "event_id": "intel:growth:7fe9fb34a75b452e1548fa87",
+      "topic": "growth",
+      "title": "Personal Income and Outlays, February 2026 - U.S. Bureau of Economic Analysis (BEA) (.gov)",
+      "url": "https://www.bea.gov/news/2026/personal-income-and-outlays-february-2026",
+      "score": 54.15,
+      "source_domain": "bea.gov",
+      "selected": true
+    },
+    {
+      "sample_id": "sel-06",
+      "event_id": "intel:inflation:fc6dc3c6739cfb5244f16966",
+      "topic": "inflation",
+      "title": "US PCE inflation picks up in February; consumer spending solid - Reuters",
+      "url": "https://www.reuters.com/business/us-pce-inflation-picks-up-february-consumer-spending-solid-2026-04-09/",
+      "score": 53.35,
+      "source_domain": "reuters.com",
+      "selected": true
+    },
+    {
+      "sample_id": "rej-01",
+      "event_id": "intel:market_anomaly:5e91ed7f7820ef406a246eca",
+      "topic": "market_anomaly",
+      "title": "U.S.-Iran ceasefire relief rally lifts global assets as oil plunges below $100 - CNBC",
+      "url": "https://www.cnbc.com/2026/04/08/us-iran-ceasefire-gold-oil-stocks-treasuries.html",
+      "score": 57.35,
+      "source_domain": "cnbc.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-02",
+      "event_id": "intel:geopolitics:c4910b6b564a3bd41e9b83ae",
+      "topic": "geopolitics",
+      "title": "Asian stocks mostly higher and oil gains ahead of planned U.S.-Iran peace talks - AP News",
+      "url": "https://apnews.com/article/stock-markets-trump-iran-ceasefire-oil-7ef6ebab1aaa731d2da6406b3cbde6dd",
+      "score": 56.15,
+      "source_domain": "apnews.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-03",
+      "event_id": "intel:fx:25cd54ce4edc51785ea40c8f",
+      "topic": "fx",
+      "title": "U.S. Treasury Yields, Dollar Fall in European Trade - WSJ",
+      "url": "https://www.wsj.com/finance/jgbs-rise-as-inflation-concerns-ease-after-trumps-cease-fire-agreement-72092ed7",
+      "score": 55.15,
+      "source_domain": "wsj.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-04",
+      "event_id": "intel:financial_stability:7a9111bf7a4e23bda263d3ea",
+      "topic": "financial_stability",
+      "title": "BSP in wait-and-see mode amid energy shock, says Governor Eli Remolona - CNBC",
+      "url": "https://www.cnbc.com/video/2026/04/10/bsp-in-wait-and-see-mode-amid-energy-shock-says-governor-eli-remolona.html",
+      "score": 54.35,
+      "source_domain": "cnbc.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-05",
+      "event_id": "intel:energy_shock:ed18bbbc8024bae0c6b667df",
+      "topic": "energy_shock",
+      "title": "Attacks cut Saudi oil output and East-West pipeline flow, state news agency says - Reuters",
+      "url": "https://www.reuters.com/business/energy/operational-activities-halted-several-energy-facilities-saudi-arabia-state-news-2026-04-09/",
+      "score": 53.75,
+      "source_domain": "reuters.com",
+      "selected": false,
+      "reject_reason": "quota_cross"
+    },
+    {
+      "sample_id": "rej-06",
+      "event_id": "intel:growth_inflation:1ba36a3f2b7f29be1bc53daa",
+      "topic": "growth_inflation",
+      "title": "三大指数重返扩张区间 经济景气水平回升--透视3月PMI数据",
+      "url": "http://sjt.guizhou.gov.cn/zwgk/zdlyxx/tjsj/202604/t20260410_89979353.html",
+      "score": 51.75,
+      "source_domain": "sjt.guizhou.gov.cn",
+      "selected": false,
+      "reject_reason": "below_threshold"
+    }
+  ]
+}

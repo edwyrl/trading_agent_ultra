@@ -90,6 +90,18 @@ sources:
       - "marketwatch.com"
       - "apnews.com"
 
+source_policy:
+  deny_domains:
+    - baijiahao.baidu.com
+    - mbd.baidu.com
+    - toutiao.com
+
+usage_alert:
+  bocha_call_warn: 8
+  tavily_call_warn: 8
+  bocha_attempt_warn: 10
+  tavily_attempt_warn: 10
+
 engines:
   tavily:
     search_defaults:

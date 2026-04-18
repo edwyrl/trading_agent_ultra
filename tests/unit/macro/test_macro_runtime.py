@@ -114,6 +114,20 @@ class InMemoryMacroRepository:
         return sorted(rows, key=lambda x: x.created_at, reverse=True)
 
 
+class _FlushTracker:
+    def __init__(self) -> None:
+        self.flush_count = 0
+
+    def flush(self) -> None:
+        self.flush_count += 1
+
+
+class InMemoryMacroRepositoryWithSession(InMemoryMacroRepository):
+    def __init__(self) -> None:
+        super().__init__()
+        self.session = _FlushTracker()
+
+
 def _event(event_id: str, title: str, summary: str, theme_type: str, bias_hint: str | None = None) -> MacroEvent:
     payload = {
         "event_id": event_id,
@@ -210,3 +224,17 @@ def test_macro_event_history_links_to_views_and_snapshot_evidence() -> None:
 def test_source_ref_structure_is_serializable() -> None:
     ref = SourceRefDTO(source_type="NEWS", title="test", retrieved_at=datetime.now(UTC))
     assert ref.model_dump(mode="json")["title"] == "test"
+
+
+def test_macro_updater_flushes_repository_session_when_available() -> None:
+    repo = InMemoryMacroRepositoryWithSession()
+    updater = MacroUpdater(repository=repo)
+
+    updater.run_daily_incremental_update(
+        as_of_date=date(2026, 3, 26),
+        events=[
+            _event("evt-flush-1", "流动性边际改善", "央行操作稳定市场预期", "POLICY_ENVIRONMENT"),
+        ],
+    )
+
+    assert repo.session.flush_count >= 1

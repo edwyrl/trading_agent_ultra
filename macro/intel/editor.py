@@ -29,13 +29,32 @@ class MacroWhyItMattersEditor:
     def from_settings(cls) -> "MacroWhyItMattersEditor | None":
         try:
             router = LLMRouter(registry=LLMRegistry.from_yaml(settings.llm.models_config_path))
-            # Warm up and validate role during boot.
-            router.resolve(role=settings.macro_intel.editor_role)
+            selected_role = _resolve_first_usable_role(
+                router=router,
+                role_candidates=[
+                    settings.macro_intel.editor_role,
+                    "summarize",
+                    "cn_research",
+                    "fast_draft",
+                ],
+            )
         except Exception as exc:
             get_logger(__name__).warning("macro_editor_role_invalid role=%s err=%s", settings.macro_intel.editor_role, exc)
             return None
+        if selected_role is None:
+            get_logger(__name__).warning(
+                "macro_editor_no_usable_role configured_role=%s",
+                settings.macro_intel.editor_role,
+            )
+            return None
+        if selected_role != settings.macro_intel.editor_role:
+            get_logger(__name__).warning(
+                "macro_editor_role_fallback from=%s to=%s",
+                settings.macro_intel.editor_role,
+                selected_role,
+            )
         return cls(
-            role=settings.macro_intel.editor_role,
+            role=selected_role,
             router=router,
             timeout_seconds=settings.macro_intel.editor_timeout_seconds,
         )
@@ -137,6 +156,31 @@ def _provider_settings(provider: LLMProvider) -> tuple[str, str]:
     if provider == LLMProvider.SILICONFLOW:
         return settings.llm.siliconflow.api_key, settings.llm.siliconflow.base_url
     return "", ""
+
+
+def _has_provider_credentials(provider: LLMProvider) -> bool:
+    api_key, base_url = _provider_settings(provider)
+    return bool((api_key or "").strip() and (base_url or "").strip())
+
+
+def _resolve_first_usable_role(
+    *,
+    router: LLMRouter,
+    role_candidates: list[str],
+) -> str | None:
+    seen: set[str] = set()
+    for role in role_candidates:
+        candidate = (role or "").strip()
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            route = router.resolve(role=candidate)
+        except Exception:
+            continue
+        if _has_provider_credentials(route.model.provider):
+            return candidate
+    return None
 
 
 def _chat_completion_openai_compatible(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, date, datetime
 
 from contracts.confidence import ConfidenceDTO
@@ -133,3 +134,69 @@ def test_no_recent_events_skip(tmp_path) -> None:
     result = notifier.send_recent_digest(hours=24, dry_run=True)
     assert result["sent"] is False
     assert result["reason"] == "no_recent_events"
+
+
+def test_eval_digest_dry_run_renders_review_template(tmp_path) -> None:
+    recipients_doc = tmp_path / "recipients.md"
+    recipients_doc.write_text("- reviewer@example.com\n", encoding="utf-8")
+    eval_pack = tmp_path / "macro_eval_pack_latest.json"
+    eval_pack.write_text(
+        json.dumps(
+            {
+                "as_of_date": "2026-04-09",
+                "selected_samples": [
+                    {
+                        "sample_id": "sel-01",
+                        "event_id": "intel:monetary_policy:abc",
+                        "topic": "monetary_policy",
+                        "title": "央行操作维持流动性",
+                        "url": "https://www.pbc.gov.cn/a1",
+                        "score": 67.5,
+                        "source_domain": "pbc.gov.cn",
+                        "selected": True,
+                    }
+                ],
+                "non_selected_samples": [
+                    {
+                        "sample_id": "rej-01",
+                        "event_id": "intel:fx:def",
+                        "topic": "fx",
+                        "title": "汇率市场短评",
+                        "url": "https://example.com/fx",
+                        "score": 53.0,
+                        "source_domain": "example.com",
+                        "selected": False,
+                        "reject_reason": "quota_topic",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    repo = FakeRepository(histories=[], views=[], master=_sample_master())
+    client = ResendEmailClient(api_key="sk_test", base_url="https://api.resend.com/emails")
+    notifier = MacroDigestNotifier(
+        repository=repo,
+        email_client=client,
+        from_email="macro@example.com",
+        recipients_doc_path=str(recipients_doc),
+        eval_google_form_url="https://docs.google.com/forms/d/e/demo/viewform",
+        eval_form_entry_date="entry.92686352",
+        eval_form_entry_sample_id="entry.1723622274",
+        eval_form_entry_selected="entry.273883245",
+        eval_form_entry_topic="entry.301707955",
+        eval_form_entry_event_id="entry.1009229059",
+    )
+
+    result = notifier.send_eval_digest(eval_pack_path=str(eval_pack), dry_run=True)
+    assert result["reason"] == "dry_run"
+    assert result["selected_count"] == 1
+    assert result["non_selected_count"] == 1
+    assert "Google Form 入口:" in result["text_preview"]
+    assert "entry.92686352=2026-04-09" in result["text_preview"]
+    assert "entry.1723622274=sel-01" in result["text_preview"]
+    assert "entry.273883245=True" in result["text_preview"]
+    assert "该不该报(Y/N)" in result["text_preview"]
+    assert "是否重复(Y/N" in result["text_preview"]

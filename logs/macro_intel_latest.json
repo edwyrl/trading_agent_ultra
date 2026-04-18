@@ -1,0 +1,183 @@
+{
+  "as_of_date": "2026-04-11",
+  "generated_at": "2026-04-10T17:14:12.936565+00:00",
+  "event_count": 8,
+  "events": [
+    {
+      "event_id": "intel:market_anomaly:044f68c77497bb5873d3e232",
+      "title": "Precious Metals Rise, Boosted by Dollar Weakness, Lower Treasury Yields - WSJ",
+      "region": "Cross",
+      "category": "market_anomaly",
+      "summary": "Precious Metals Rise, Boosted by Dollar Weakness, Lower Treasury Yields - WSJ | score=58.95 | docs=1 | domains=wsj.com | labels=keyword:Iran,market_move:oil,market_move:treasury yield,market_move:dollar",
+      "what_happened": "Precious Metals Rise, Boosted by Dollar Weakness, Lower Treasury Yields - WSJ",
+      "why_it_matters": "Cross的market_anomaly事件触发“Iran”信号，可能通过利率、汇率与风险偏好传导至市场。",
+      "market_impact": "主要影响：利率/汇率/大宗商品",
+      "key_numbers": [],
+      "policy_signal": "待观察",
+      "confidence": "medium",
+      "score": 58.95,
+      "sources": [
+        "wsj.com"
+      ],
+      "published_at": "",
+      "labels": [
+        "keyword:Iran",
+        "market_move:oil",
+        "market_move:treasury yield",
+        "market_move:dollar",
+        "market_move:gold"
+      ]
+    },
+    {
+      "event_id": "intel:banking_credit:868fcd71504a6f9c86ad331d",
+      "title": "Effects of Stablecoin Yield Prohibition on Bank Lending - The White House (.gov)",
+      "region": "US",
+      "category": "banking_credit",
+      "summary": "Effects of Stablecoin Yield Prohibition on Bank Lending - The White House (.gov) | score=55.55 | docs=1 | domains=whitehouse.gov | labels=market_move:dollar",
+      "what_happened": "Effects of Stablecoin Yield Prohibition on Bank Lending - The White House (.gov)",
+      "why_it_matters": "US的banking_credit事件触发“dollar”信号，可能通过利率、汇率与风险偏好传导至市场。",
+      "market_impact": "主要影响：利率/汇率",
+      "key_numbers": [],
+      "policy_signal": "待观察",
+      "confidence": "medium",
+      "score": 55.55,
+      "sources": [
+        "whitehouse.gov"
+      ],
+      "published_at": "",
+      "labels": [
+        "market_move:dollar"
+      ]
+    },
+    {
+      "event_id": "intel:trade_fx:1b23dbaec1dce87e0031bdc1",
+      "title": "汇率避险知识速递(一)汇率风险来源_分局动态_上海市分局",
+      "region": "CN",
+      "category": "trade_fx",
+      "summary": "汇率避险知识速递(一)汇率风险来源_分局动态_上海市分局 | score=54.15 | docs=1 | domains=safe.gov.cn | labels=keyword:汇率",
+      "what_happened": "汇率避险知识速递(一)汇率风险来源_分局动态_上海市分局",
+      "why_it_matters": "CN的trade_fx事件触发“汇率”信号，可能通过利率、汇率与风险偏好传导至市场。",
+      "market_impact": "主要影响：汇率",
+      "key_numbers": [],
+      "policy_signal": "待观察",
+      "confidence": "medium",
+      "score": 54.15,
+      "sources": [
+        "safe.gov.cn"
+      ],
+      "published_at": "",
+      "labels": [
+        "keyword:汇率"
+      ]
+    },
+    {
+      "event_id": "intel:market_anomaly:820f2eff5afb776d7e9a0b1e",
+      "title": "Gold rises to near three-week high as Trump pauses attacks on Iran - CNBC",
+      "region": "Cross",
+      "category": "market_anomaly",
+      "summary": "Gold rises to near three-week high as Trump pauses attacks on Iran - CNBC | score=58.15 | docs=1 | domains=cnbc.com | labels=keyword:Iran,market_move:gold",
+      "what_happened": "Gold rises to near three-week high as Trump pauses attacks on Iran - CNBC",
+      "why_it_matters": "Cross的market_anomaly事件触发“Iran”信号，可能通过利率、汇率与风险偏好传导至市场。",
+      "market_impact": "主要影响：利率/大宗商品",
+      "key_numbers": [],
+      "policy_signal": "待观察",
+      "confidence": "medium",
+      "score": 58.15,
+      "sources": [
+        "cnbc.com"
+      ],
+      "published_at": "",
+      "labels": [
+        "keyword:Iran",
+        "market_move:gold"
+      ]
+    },
+    {
+      "event_id": "intel:growth:7fe9fb34a75b452e1548fa87",
+      "title": "Personal Income and Outlays, February 2026 - U.S. Bureau of Economic Analysis (BEA) (.gov)",
+      "region": "US",
+      "category": "growth",
+      "summary": "Personal Income and Outlays, February 2026 - U.S. Bureau of Economic Analysis (BEA) (.gov) | score=54.15 | docs=1 | domains=bea.gov | labels=market_move:dollar",
+      "what_happened": "Personal Income and Outlays, February 2026 - U.S. Bureau of Economic Analysis (BEA) (.gov)",
+      "why_it_matters": "US的growth事件触发“dollar”信号，可能通过利率、汇率与风险偏好传导至市场。",
+      "market_impact": "主要影响：汇率",
+      "key_numbers": [],
+      "policy_signal": "待观察",
+      "confidence": "medium",
+      "score": 54.15,
+      "sources": [
+        "bea.gov"
+      ],
+      "published_at": "",
+      "labels": [
+        "market_move:dollar"
+      ]
+    },
+    {
+      "event_id": "intel:inflation:fc6dc3c6739cfb5244f16966",
+      "title": "US PCE inflation picks up in February; consumer spending solid - Reuters",
+      "region": "US",
+      "category": "inflation",
+      "summary": "US PCE inflation picks up in February; consumer spending solid - Reuters | score=53.35 | docs=1 | domains=reuters.com | labels=keyword:Iran,keyword:Israel,keyword:Fed,market_move:treasury yield",
+      "what_happened": "US PCE inflation picks up in February; consumer spending solid - Reuters",
+      "why_it_matters": "US的inflation事件触发“Iran”信号，可能通过利率、汇率与风险偏好传导至市场。",
+      "market_impact": "主要影响：利率",
+      "key_numbers": [],
+      "policy_signal": "待观察",
+      "confidence": "medium",
+      "score": 53.35,
+      "sources": [
+        "reuters.com"
+      ],
+      "published_at": "",
+      "labels": [
+        "keyword:Iran",
+        "keyword:Israel",
+        "keyword:Fed",
+        "market_move:treasury yield"
+      ]
+    },
+    {
+      "event_id": "intel:trade_fx:1b798281800f86567f5643f5",
+      "title": "China's goods trade surplus: beyond the numbers, supporting the global economy | english.scio.gov.cn",
+      "region": "CN",
+      "category": "trade_fx",
+      "summary": "China's goods trade surplus: beyond the numbers, supporting the global economy | english.scio.gov.cn | score=53.15 | docs=1 | domains=english.scio.gov.cn | labels=market_move:dollar",
+      "what_happened": "China's goods trade surplus: beyond the numbers, supporting the global economy | english.scio.gov.cn",
+      "why_it_matters": "CN的trade_fx事件触发“dollar”信号，可能通过利率、汇率与风险偏好传导至市场。",
+      "market_impact": "主要影响：汇率",
+      "key_numbers": [],
+      "policy_signal": "待观察",
+      "confidence": "medium",
+      "score": 53.15,
+      "sources": [
+        "english.scio.gov.cn"
+      ],
+      "published_at": "",
+      "labels": [
+        "market_move:dollar"
+      ]
+    },
+    {
+      "event_id": "intel:financial_regulation:14014c286957aa55c99bcf8a",
+      "title": "问题与解答",
+      "region": "CN",
+      "category": "financial_regulation",
+      "summary": "问题与解答 | score=53.15 | docs=1 | domains=suggest.sasac.gov.cn | labels=market_move:黄金",
+      "what_happened": "问题与解答",
+      "why_it_matters": "CN的financial_regulation事件触发“黄金”信号，可能通过利率、汇率与风险偏好传导至市场。",
+      "market_impact": "主要影响：大宗商品",
+      "key_numbers": [],
+      "policy_signal": "待观察",
+      "confidence": "medium",
+      "score": 53.15,
+      "sources": [
+        "suggest.sasac.gov.cn"
+      ],
+      "published_at": "",
+      "labels": [
+        "market_move:黄金"
+      ]
+    }
+  ]
+}

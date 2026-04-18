@@ -34,15 +34,22 @@ if [[ "$rc_cycle" -eq 0 ]]; then
   "$PY_BIN" scripts/send_macro_digest_email.py --hours 24 >>"$LOG_FILE" 2>&1 || rc_mail=$?
 fi
 
+rc_eval=0
+if [[ "$rc_cycle" -eq 0 ]] && [[ "$(date +%H)" == "20" ]]; then
+  "$PY_BIN" scripts/send_macro_digest_email.py --eval-mode >>"$LOG_FILE" 2>&1 || rc_eval=$?
+fi
+
 rc=0
 if [[ "$rc_cycle" -ne 0 ]]; then
   rc="$rc_cycle"
 elif [[ "$rc_mail" -ne 0 ]]; then
   rc="$rc_mail"
+elif [[ "$rc_eval" -ne 0 ]]; then
+  rc="$rc_eval"
 fi
 
 end_ts="$(date '+%Y-%m-%d %H:%M:%S %z')"
-echo "[$end_ts] macro_intel_cron end rc=$rc (cycle=$rc_cycle, mail=$rc_mail)" >>"$LOG_FILE"
+echo "[$end_ts] macro_intel_cron end rc=$rc (cycle=$rc_cycle, mail=$rc_mail, eval=$rc_eval)" >>"$LOG_FILE"
 echo "" >>"$LOG_FILE"
 
 exit "$rc"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, date, datetime, timedelta
 
 from contracts.enums import MacroThemeType
@@ -16,8 +17,14 @@ class FakeClient:
         self.engine = engine
         self.rows = rows
 
-    def search(self, spec: SearchQuerySpec, *, include_domains: list[str] | None = None) -> list[RawArticle]:
-        _ = include_domains
+    def search(
+        self,
+        spec: SearchQuerySpec,
+        *,
+        include_domains: list[str] | None = None,
+        exclude_domains: list[str] | None = None,
+    ) -> list[RawArticle]:
+        _ = (include_domains, exclude_domains)
         out: list[RawArticle] = []
         for row in self.rows:
             out.append(
@@ -65,8 +72,14 @@ class SpecAwareClient:
     def __init__(self, engine: SearchEngine):
         self.engine = engine
 
-    def search(self, spec: SearchQuerySpec, *, include_domains: list[str] | None = None) -> list[RawArticle]:
-        _ = include_domains
+    def search(
+        self,
+        spec: SearchQuerySpec,
+        *,
+        include_domains: list[str] | None = None,
+        exclude_domains: list[str] | None = None,
+    ) -> list[RawArticle]:
+        _ = (include_domains, exclude_domains)
         order_map = {
             "q_cn_1": 1,
             "q_cn_2": 2,
@@ -383,6 +396,9 @@ def test_pipeline_writes_overwrite_log_with_required_fields(tmp_path) -> None:
     _ = pipeline.run(as_of_date=date(2026, 3, 25))
     first = json.loads(log_path.read_text(encoding="utf-8"))
     assert first["event_count"] >= 1
+    assert first["search_usage"]["call_count"]["bocha"] == 2
+    assert first["search_usage"]["call_count"]["tavily"] == 0
+    assert first["search_usage"]["api_attempts"]["bocha"] == 2
     entry = first["events"][0]
     assert {"region", "category", "why_it_matters", "score"} <= set(entry.keys())
     assert {"summary", "key_numbers", "policy_signal", "confidence"} <= set(entry.keys())
@@ -397,7 +413,37 @@ def test_pipeline_writes_overwrite_log_with_required_fields(tmp_path) -> None:
     second = json.loads(log_path.read_text(encoding="utf-8"))
     assert second["as_of_date"] == "2026-03-26"
     assert second["event_count"] == 0
+    assert second["search_usage"]["call_count"]["bocha"] == 2
     assert second["events"] == []
+
+
+def test_pipeline_warns_when_search_usage_exceeds_threshold(caplog) -> None:
+    config_payload = _config().model_dump()
+    config_payload["usage_alert"] = {
+        "bocha_call_warn": 0,
+        "tavily_call_warn": 0,
+        "bocha_attempt_warn": 0,
+        "tavily_attempt_warn": 0,
+    }
+    config = MacroIntelConfig.model_validate(config_payload)
+    bocha_rows = [
+        {
+            "title": "中国央行公开市场操作维持流动性",
+            "url": "https://www.pbc.gov.cn/a1",
+            "content": "流动性与汇率稳定",
+            "published_at": datetime.now(UTC),
+        }
+    ]
+
+    pipeline = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: FakeClient(SearchEngine.BOCHA, bocha_rows)},
+    )
+
+    with caplog.at_level(logging.WARNING):
+        _ = pipeline.run(as_of_date=date(2026, 3, 25))
+
+    assert any("macro_intel_search_usage_alert" in rec.message and "engine=bocha" in rec.message for rec in caplog.records)
 
 
 def test_pipeline_applies_region_and_topic_quotas() -> None:
@@ -415,6 +461,67 @@ def test_pipeline_applies_region_and_topic_quotas() -> None:
     assert sum(t.startswith("US-") for t in titles) == 1
     assert sum(t.startswith("Cross-") for t in titles) == 2
     assert sum("-fx-" in t for t in titles) == 1
+
+
+def test_pipeline_event_id_is_stable_across_dates() -> None:
+    config_payload = _config().model_dump()
+    config_payload["layers"]["sentinel"] = []
+    config = MacroIntelConfig.model_validate(config_payload)
+
+    bocha_rows = [
+        {
+            "title": "中国央行公开市场操作维持流动性",
+            "url": "https://www.pbc.gov.cn/a1?tracking=abc",
+            "content": "流动性与汇率稳定",
+            "published_at": datetime(2026, 3, 25, 10, 0, tzinfo=UTC),
+        }
+    ]
+    pipeline = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: FakeClient(SearchEngine.BOCHA, bocha_rows)},
+    )
+
+    first = pipeline.run(as_of_date=date(2026, 3, 25))
+    second = pipeline.run(as_of_date=date(2026, 3, 26))
+
+    assert first and second
+    assert [e.event_id for e in first] == [e.event_id for e in second]
+    assert [e.source_id for e in first] == [e.source_id for e in second]
+    assert all("20260325" not in e.event_id and "20260326" not in e.event_id for e in first + second)
+
+
+def test_pipeline_blacklist_domains_are_hard_dropped() -> None:
+    config_payload = _config().model_dump()
+    config_payload["source_policy"] = {
+        "deny_domains": ["blocked.example.com"],
+    }
+    config_payload["scoring"]["thresholds"]["medium"] = 0
+    config_payload["scoring"]["thresholds"]["high"] = 100
+    config = MacroIntelConfig.model_validate(config_payload)
+
+    bocha_rows = [
+        {
+            "title": "央行流动性操作",
+            "url": "https://blocked.example.com/a1",
+            "content": "政策动态",
+            "published_at": datetime.now(UTC),
+        },
+        {
+            "title": "央行公开市场操作维持流动性",
+            "url": "https://www.pbc.gov.cn/a2",
+            "content": "政策动态",
+            "published_at": datetime.now(UTC),
+        },
+    ]
+    pipeline = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: FakeClient(SearchEngine.BOCHA, bocha_rows)},
+    )
+
+    events = pipeline.run(as_of_date=date(2026, 3, 25))
+
+    assert events
+    assert all("blocked.example.com" not in (e.url or "") for e in events)
 
 
 def test_pipeline_enforces_required_fields_and_editor_policy(tmp_path) -> None:
@@ -471,3 +578,82 @@ def test_pipeline_enforces_required_fields_and_editor_policy(tmp_path) -> None:
     entry = payload["events"][0]
     for key in config.output.required_fields:
         assert key in entry
+
+
+def test_pipeline_writes_eval_pack_with_reject_reasons(tmp_path) -> None:
+    config = _config_with_quotas()
+    eval_pack_path = tmp_path / "macro_eval_pack_latest.json"
+    pipeline = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: SpecAwareClient(SearchEngine.BOCHA)},
+        eval_pack_path=str(eval_pack_path),
+    )
+
+    _ = pipeline.run(as_of_date=date(2026, 3, 25))
+    payload = json.loads(eval_pack_path.read_text(encoding="utf-8"))
+
+    assert payload["as_of_date"] == "2026-03-25"
+    assert payload["targets"]["selected"] == 6
+    assert payload["targets"]["non_selected"] == 6
+    assert isinstance(payload["samples"], list)
+    assert payload["selected_count"] <= 6
+    assert payload["non_selected_count"] <= 6
+
+    non_selected = payload["non_selected_samples"]
+    assert non_selected
+    reasons = {row.get("reject_reason") for row in non_selected}
+    assert any(reason in {"quota_cn", "quota_us", "quota_cross", "quota_topic"} for reason in reasons)
+    required = {"sample_id", "event_id", "topic", "title", "url", "score", "source_domain", "selected"}
+    assert required <= set(non_selected[0].keys())
+
+
+def test_pipeline_eval_pack_fills_from_cluster_when_non_selected_pool_is_small(tmp_path) -> None:
+    config_payload = _config().model_dump()
+    config_payload["scoring"]["thresholds"]["medium"] = 95
+    config_payload["scoring"]["thresholds"]["high"] = 99
+    config_payload["upgrade_rules"] = {"keywords": [], "market_move_keywords": []}
+    config_payload["dedup"] = {
+        "title_similarity_threshold": 0.9,
+        "by": ["institution", "event_type", "key_figures", "time_window"],
+        "time_window_hours": 12,
+    }
+    config_payload["layers"] = {
+        "regular": [
+            {
+                "query_id": "q1",
+                "topic": "monetary",
+                "layer": "regular",
+                "query": "中国 货币政策",
+                "theme_type": "POLICY_ENVIRONMENT",
+                "language": "zh",
+                "region": "CN",
+                "source_profile": "CN",
+            }
+        ],
+        "sentinel": [],
+    }
+    config = MacroIntelConfig.model_validate(config_payload)
+    eval_pack_path = tmp_path / "macro_eval_pack_latest.json"
+    now = datetime.now(UTC)
+    bocha_rows = [
+        {
+            "title": "政策信号观察",
+            "url": f"https://unknown-source.example.com/a{i}",
+            "content": "普通新闻，无升级关键词",
+            "published_at": now - timedelta(minutes=i),
+        }
+        for i in range(8)
+    ]
+
+    pipeline = MacroIntelPipeline(
+        config=config,
+        clients={SearchEngine.BOCHA: FakeClient(SearchEngine.BOCHA, bocha_rows)},
+        eval_pack_path=str(eval_pack_path),
+    )
+    _ = pipeline.run(as_of_date=date(2026, 3, 25))
+
+    payload = json.loads(eval_pack_path.read_text(encoding="utf-8"))
+    non_selected = payload["non_selected_samples"]
+    assert len(non_selected) == 6
+    assert any(row.get("low_pool_fill") is True for row in non_selected)
+    assert any(row.get("reject_reason") == "dedup_or_clustered" for row in non_selected)

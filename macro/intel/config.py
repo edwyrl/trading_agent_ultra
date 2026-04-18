@@ -74,6 +74,21 @@ class QuotasConfig(BaseModel):
     max_same_topic_items: int | None = None
 
 
+class SourcePolicyConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deny_domains: list[str] = Field(default_factory=list)
+
+
+class UsageAlertConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bocha_call_warn: int = 8
+    tavily_call_warn: int = 8
+    bocha_attempt_warn: int = 10
+    tavily_attempt_warn: int = 10
+
+
 class OutputConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -99,6 +114,8 @@ class MacroIntelConfig(BaseModel):
     dedup: DedupConfig
     cluster: ClusterConfig
     quotas: QuotasConfig = Field(default_factory=QuotasConfig)
+    source_policy: SourcePolicyConfig = Field(default_factory=SourcePolicyConfig)
+    usage_alert: UsageAlertConfig = Field(default_factory=UsageAlertConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     llm_editor_policy: LLMEditorPolicyConfig = Field(default_factory=LLMEditorPolicyConfig)
 
@@ -304,6 +321,17 @@ def _convert_v1_1_to_v1(raw: dict[str, Any]) -> dict[str, Any]:
         "format": str(output_raw.get("format") or "json"),
         "required_fields": _as_str_list(output_raw.get("required_fields")),
     }
+    source_policy_raw = _as_dict(raw.get("source_policy"))
+    source_policy = {
+        "deny_domains": _as_str_list(source_policy_raw.get("deny_domains")),
+    }
+    usage_alert_raw = _as_dict(raw.get("usage_alert"))
+    usage_alert = {
+        "bocha_call_warn": _safe_int(usage_alert_raw.get("bocha_call_warn"), 8),
+        "tavily_call_warn": _safe_int(usage_alert_raw.get("tavily_call_warn"), 8),
+        "bocha_attempt_warn": _safe_int(usage_alert_raw.get("bocha_attempt_warn"), 10),
+        "tavily_attempt_warn": _safe_int(usage_alert_raw.get("tavily_attempt_warn"), 10),
+    }
     llm_editor_policy_raw = _as_dict(raw.get("llm_editor_policy"))
     llm_editor_policy = {
         "rules": _as_str_list(llm_editor_policy_raw.get("rules")),
@@ -326,6 +354,8 @@ def _convert_v1_1_to_v1(raw: dict[str, Any]) -> dict[str, Any]:
             "title_similarity_threshold": cluster_similarity,
         },
         "quotas": quotas,
+        "source_policy": source_policy,
+        "usage_alert": usage_alert,
         "output": output,
         "llm_editor_policy": llm_editor_policy,
     }
@@ -537,6 +567,14 @@ def _safe_int_or_none(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
     return out if out > 0 else None
+
+
+def _safe_int(value: Any, default: int) -> int:
+    try:
+        out = int(value)
+    except (TypeError, ValueError):
+        return default
+    return out if out > 0 else default
 
 
 def load_macro_intel_config(path: str | Path) -> MacroIntelConfig:
