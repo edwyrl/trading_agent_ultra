@@ -87,3 +87,21 @@ class EntityType(StrEnum):
     INDUSTRY_THESIS = "INDUSTRY_THESIS"
     COMPANY_CONTEXT = "COMPANY_CONTEXT"
     INTEGRATION_SIGNAL = "INTEGRATION_SIGNAL"
+
+
+class SignalRunStatus(StrEnum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELED = "CANCELED"
+
+
+class SignalSourceType(StrEnum):
+    POSTGRES = "POSTGRES"
+
+
+class EvaluationMode(StrEnum):
+    EVENT_STUDY = "EVENT_STUDY"
+    FACTOR_IC = "FACTOR_IC"
+    PORTFOLIO_BACKTEST = "PORTFOLIO_BACKTEST"

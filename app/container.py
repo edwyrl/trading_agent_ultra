@@ -20,6 +20,11 @@ from integration.recheck_executor import IndustryRecheckExecutor
 from integration.repository import PostgresIntegrationRepository
 from macro.repository import PostgresMacroRepository
 from macro.service import MacroService
+from contracts.enums import SignalSourceType
+from signals import default_signal_registry
+from signals.repository import PostgresSignalRepository
+from signals.service import SignalDashboardAssembler, SignalResearchService
+from signals.services.market_data_provider import PostgresMarketDataProvider
 from shared.config import settings
 from shared.llm.registry import LLMRegistry
 from shared.llm.router import LLMRouter
@@ -30,6 +35,7 @@ class Container:
         self.session = session
         self._llm_registry: LLMRegistry | None = None
         self._llm_router: LLMRouter | None = None
+        self._signal_registry = default_signal_registry()
 
     def macro_service(self) -> MacroService:
         return MacroService(repository=PostgresMacroRepository(self.session))
@@ -54,6 +60,25 @@ class Container:
         integration_repo = self.integration_repository()
         industry_service = self.industry_service()
         return IndustryRecheckExecutor(repository=integration_repo, industry_service=industry_service)
+
+    def signal_repository(self) -> PostgresSignalRepository:
+        return PostgresSignalRepository(self.session)
+
+    def signal_service(self) -> SignalResearchService:
+        repository = self.signal_repository()
+        registry = self._signal_registry
+
+        def _provider_factory(source_type: SignalSourceType) -> PostgresMarketDataProvider:
+            if source_type != SignalSourceType.POSTGRES:
+                raise ValueError(f"Unsupported source type: {source_type}")
+            return PostgresMarketDataProvider(self.session)
+
+        return SignalResearchService(
+            repository=repository,
+            provider_factory=_provider_factory,
+            registry=registry,
+            dashboard_assembler=SignalDashboardAssembler(),
+        )
 
     def company_context_orchestrator(self, company_repository: PostgresCompanyRepository) -> CompanyContextOrchestrator:
         macro_service = self.macro_service()
